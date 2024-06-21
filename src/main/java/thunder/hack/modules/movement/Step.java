@@ -1,6 +1,7 @@
 package thunder.hack.modules.movement;
 
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import thunder.hack.ThunderHack;
 import thunder.hack.core.impl.ModuleManager;
@@ -11,11 +12,11 @@ import thunder.hack.setting.Setting;
 public class Step extends Module {
 
     private final thunder.hack.utility.Timer stepTimer = new thunder.hack.utility.Timer();
-    public Setting<Boolean> strict = new Setting<>("Strict", false);
-    public Setting<Float> height = new Setting("Height", 2.0F, 1F, 2.5F, v -> !strict.getValue());
-    public Setting<Boolean> useTimer = new Setting<>("Timer", true);
-    public Setting<Boolean> pauseIfShift = new Setting<>("PauseIfShift", false);
-    public Setting<Integer> stepDelay = new Setting("StepDelay", 200, 0, 1000);
+    private final Setting<Boolean> strict = new Setting<>("Strict", false);
+    private final Setting<Float> height = new Setting("Height", 2.0F, 1F, 2.5F, v -> !strict.getValue());
+    private final Setting<Boolean> useTimer = new Setting<>("Timer", true);
+    private final Setting<Boolean> pauseIfShift = new Setting<>("PauseIfShift", false);
+    private final Setting<Integer> stepDelay = new Setting("StepDelay", 200, 0, 1000);
     private final Setting<Mode> mode = new Setting<>("Mode", Mode.NCP);
     private boolean timer;
 
@@ -26,18 +27,18 @@ public class Step extends Module {
     @Override
     public void onDisable() {
         ThunderHack.TICK_TIMER = 1f;
-        mc.player.setStepHeight(0.6F);
+        setStepHeight(0.6F);
     }
 
     @Override
     public void onUpdate() {
         if (pauseIfShift.getValue() && mc.options.sneakKey.isPressed()) {
-            mc.player.setStepHeight(0.6F);
+            setStepHeight(0.6F);
             return;
         }
 
         if (mc.player.getAbilities().flying || ModuleManager.freeCam.isOn() || mc.player.isRiding() || mc.player.isTouchingWater()) {
-            mc.player.setStepHeight(0.6F);
+            setStepHeight(0.6F);
             return;
         }
 
@@ -47,8 +48,8 @@ public class Step extends Module {
         }
 
         if (mc.player.isOnGround() && stepTimer.passedMs(stepDelay.getValue()))
-            mc.player.setStepHeight(height.getValue());
-        else mc.player.setStepHeight(0.6F);
+            setStepHeight(height.getValue());
+        else setStepHeight(0.6F);
     }
 
     @EventHandler
@@ -83,6 +84,10 @@ public class Step extends Module {
             case 250000 -> new double[]{0.425, 0.821, 0.699, 0.599, 1.022, 1.372, 1.652, 1.869, 2.019, 1.907};
             default -> null;
         };
+    }
+
+    private void setStepHeight(float v) {
+        mc.player.getAttributeInstance(EntityAttributes.GENERIC_STEP_HEIGHT).setBaseValue(v);
     }
 
     public enum Mode {NCP, VANILLA}

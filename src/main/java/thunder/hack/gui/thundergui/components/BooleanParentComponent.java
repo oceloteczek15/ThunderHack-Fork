@@ -3,11 +3,9 @@ package thunder.hack.gui.thundergui.components;
 import net.minecraft.client.util.math.MatrixStack;
 import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.gui.thundergui.ThunderGui;
-import thunder.hack.modules.client.ClickGui;
+import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.BooleanParent;
-import thunder.hack.utility.math.FrameRateCounter;
-import thunder.hack.utility.math.MathUtility;
+import thunder.hack.setting.impl.BooleanSettingGroup;
 import thunder.hack.utility.render.Render2DEngine;
 
 import java.awt.*;
@@ -16,7 +14,7 @@ import static thunder.hack.utility.render.animation.AnimationUtility.fast;
 
 public class BooleanParentComponent extends SettingElement {
     float animation = 0f;
-    private final Setting<BooleanParent> parentSetting;
+    private final Setting<BooleanSettingGroup> parentSetting;
 
     public BooleanParentComponent(Setting setting) {
         super(setting);
@@ -29,10 +27,10 @@ public class BooleanParentComponent extends SettingElement {
         if ((getY() > ThunderGui.getInstance().main_posY + ThunderGui.getInstance().height) || getY() < ThunderGui.getInstance().main_posY) {
             return;
         }
-        FontRenderers.modules.drawString(stack,getSetting().getName(), (float) getX(), (float) getY() + 5, isHovered() ? -1 : new Color(0xB0FFFFFF, true).getRGB(), false);
+        FontRenderers.modules.drawString(stack,getSetting().getName(), (float) getX(), (float) getY() + 5, isHovered() ? -1 : new Color(0xB0FFFFFF, true).getRGB());
         animation = fast(animation, getParentSetting().getValue().isEnabled() ? 1 : 0, 15f);
         double paddingX = 7 * animation;
-        Color color = ClickGui.getInstance().getColor(0);
+        Color color = HudEditor.getColor(1);
         Render2DEngine.drawRound(stack,(float) (x + width - 18), (float) (y + height / 2 - 4), 15, 8, 4, paddingX > 4 ? color : new Color(0xFFB2B1B1));
         Render2DEngine.drawRound(stack,(float) (x + width - 17 + paddingX), (float) (y + height / 2 - 3), 6, 6, 3, new Color(-1));
     }
@@ -45,7 +43,7 @@ public class BooleanParentComponent extends SettingElement {
         if (isHovered()) getParentSetting().getValue().setEnabled(!getParentSetting().getValue().isEnabled());
     }
 
-    public Setting<BooleanParent> getParentSetting() {
+    public Setting<BooleanSettingGroup> getParentSetting() {
         return parentSetting;
     }
 }

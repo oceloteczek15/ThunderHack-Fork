@@ -21,8 +21,8 @@ import static thunder.hack.modules.Module.mc;
 
 public class FriendComponent {
     float scroll_animation = 0f;
-    Identifier head = null;
-    Identifier crackedSkin = new Identifier("textures/cracked.png");
+    private Identifier head = null;
+    private final Identifier crackedSkin = new Identifier("thunderhack", "textures/gui/elements/cracked.png");
     private final String name;
     private int posX;
     private int posY;
@@ -140,11 +140,11 @@ public class FriendComponent {
             context.drawTexture(crackedSkin, posX + 10, posY + 3, 0, 0, 22, 22, 22, 22);
         }
 
-        FontRenderers.modules.drawString(context.getMatrices(), name, posX + 37, posY + 6, Render2DEngine.applyOpacity(-1, getFadeFactor()), false);
+        FontRenderers.modules.drawString(context.getMatrices(), name, posX + 37, posY + 6, Render2DEngine.applyOpacity(-1, getFadeFactor()));
 
         boolean online = mc.player.networkHandler.getPlayerList().contains(name);
 
-        FontRenderers.settings.drawString(context.getMatrices(), online ? "online" : "offline", posX + 37, posY + 17, online ? Render2DEngine.applyOpacity(new Color(0xFF0B7A00, true).getRGB(), getFadeFactor()) : Render2DEngine.applyOpacity(new Color(0xFFBDBDBD, true).getRGB(), getFadeFactor()), false);
+        FontRenderers.settings.drawString(context.getMatrices(), online ? "online" : "offline", posX + 37, posY + 17, online ? Render2DEngine.applyOpacity(new Color(0xFF0B7A00, true).getRGB(), getFadeFactor()) : Render2DEngine.applyOpacity(new Color(0xFFBDBDBD, true).getRGB(), getFadeFactor()));
     }
 
     private float getFadeFactor() {

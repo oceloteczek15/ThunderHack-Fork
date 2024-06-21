@@ -14,10 +14,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import thunder.hack.ThunderHack;
 import thunder.hack.core.Core;
 import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.events.impl.*;
+import thunder.hack.modules.Module;
 
 import static thunder.hack.modules.Module.fullNullCheck;
 import static thunder.hack.modules.Module.mc;
@@ -28,6 +30,8 @@ public abstract class MixinClientPlayerEntity extends AbstractClientPlayerEntity
     boolean pre_sprint_state = false;
     @Unique
     private boolean updateLock = false;
+    @Unique
+    private Runnable postAction;
 
     @Shadow
     public abstract float getPitch(float tickDelta);
@@ -40,9 +44,8 @@ public abstract class MixinClientPlayerEntity extends AbstractClientPlayerEntity
 
     @Inject(method = "tick", at = @At("HEAD"))
     public void tickHook(CallbackInfo info) {
-        if (mc.player != null && mc.world != null) {
-            ThunderHack.EVENT_BUS.post(new PlayerUpdateEvent());
-        }
+        if(Module.fullNullCheck()) return;
+        ThunderHack.EVENT_BUS.post(new PlayerUpdateEvent());
     }
 
     @Redirect(method = "tickMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerEntity;isUsingItem()Z"), require = 0)
@@ -52,8 +55,22 @@ public abstract class MixinClientPlayerEntity extends AbstractClientPlayerEntity
         return player.isUsingItem();
     }
 
+    @Inject(method = "shouldSlowDown", at = @At("HEAD"), cancellable = true)
+    public void shouldSlowDownHook(CallbackInfoReturnable<Boolean> cir) {
+        if(ModuleManager.noSlow.isEnabled()) {
+            if (isCrawling()) {
+                if (ModuleManager.noSlow.crawl.getValue())
+                    cir.setReturnValue(false);
+            } else {
+                if (ModuleManager.noSlow.sneak.getValue())
+                    cir.setReturnValue(false);
+            }
+        }
+    }
+
     @Inject(method = "move", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/AbstractClientPlayerEntity;move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V"), cancellable = true)
     public void onMoveHook(MovementType movementType, Vec3d movement, CallbackInfo ci) {
+        if(Module.fullNullCheck()) return;
         EventMove event = new EventMove(movement.x, movement.y, movement.z);
         ThunderHack.EVENT_BUS.post(event);
         if (event.isCancelled()) {
@@ -67,6 +84,7 @@ public abstract class MixinClientPlayerEntity extends AbstractClientPlayerEntity
         if (fullNullCheck()) return;
         EventSync event = new EventSync(getYaw(), getPitch());
         ThunderHack.EVENT_BUS.post(event);
+        postAction = event.getPostAction();
         EventSprint e = new EventSprint(isSprinting());
         ThunderHack.EVENT_BUS.post(e);
         ThunderHack.EVENT_BUS.post(new EventAfterRotate());
@@ -91,11 +109,17 @@ public abstract class MixinClientPlayerEntity extends AbstractClientPlayerEntity
         Core.lockSprint = false;
         EventPostSync event = new EventPostSync();
         ThunderHack.EVENT_BUS.post(event);
-        if (event.isCancelled()) info.cancel();
+        if(postAction != null) {
+            postAction.run();
+            postAction = null;
+        }
+        if (event.isCancelled())
+            info.cancel();
     }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerEntity;sendMovementPackets()V", ordinal = 0, shift = At.Shift.AFTER), cancellable = true)
     private void PostUpdateHook(CallbackInfo info) {
+        if(Module.fullNullCheck()) return;
         if (updateLock) {
             return;
         }
@@ -116,8 +140,14 @@ public abstract class MixinClientPlayerEntity extends AbstractClientPlayerEntity
 
     @Inject(method = "pushOutOfBlocks", at = @At("HEAD"), cancellable = true)
     private void onPushOutOfBlocksHook(double x, double d, CallbackInfo info) {
-        if (ModuleManager.velocity.isEnabled() && ModuleManager.velocity.blocks.getValue()) {
+        if (ModuleManager.noPush.isEnabled() && ModuleManager.noPush.blocks.getValue()) {
             info.cancel();
         }
+    }
+
+    @Inject(method = "updateNausea", at = @At("HEAD"), cancellable = true)
+    private void updateNauseaHook(CallbackInfo ci) {
+        if(ModuleManager.portalInventory.isEnabled())
+            ci.cancel();
     }
 }

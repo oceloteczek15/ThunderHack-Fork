@@ -1,6 +1,7 @@
 package thunder.hack.modules.combat;
 
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
 import thunder.hack.events.impl.EventSync;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
@@ -14,11 +15,8 @@ import thunder.hack.utility.player.PlayerUtility;
 public class BowSpam extends Module {
     private final Setting<Integer> ticks = new Setting<>("Delay", 3, 0, 20);
 
-    private static BowSpam instance;
-
     public BowSpam() {
         super("BowSpam", Category.COMBAT);
-        instance = this;
     }
 
     @EventHandler
@@ -26,13 +24,9 @@ public class BowSpam extends Module {
         if ((mc.player.getOffHandStack().getItem() == Items.BOW || mc.player.getMainHandStack().getItem() == Items.BOW) && mc.player.isUsingItem()) {
             if (mc.player.getItemUseTime() >= this.ticks.getValue()) {
                 sendPacket(new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.RELEASE_USE_ITEM, BlockPos.ORIGIN, mc.player.getHorizontalFacing()));
-                sendPacket(new PlayerInteractItemC2SPacket(mc.player.getOffHandStack().getItem() == Items.BOW ? Hand.OFF_HAND : Hand.MAIN_HAND, PlayerUtility.getWorldActionId(mc.world)));
+                sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(mc.player.getOffHandStack().getItem() == Items.BOW ? Hand.OFF_HAND : Hand.MAIN_HAND, id));
                 mc.player.stopUsingItem();
             }
         }
-    }
-
-    public static BowSpam getInstance() {
-        return instance;
     }
 }

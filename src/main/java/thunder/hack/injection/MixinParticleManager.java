@@ -1,28 +1,35 @@
 package thunder.hack.injection;
 
 import net.minecraft.client.particle.*;
-import thunder.hack.ThunderHack;
-import thunder.hack.core.impl.ModuleManager;
-import thunder.hack.events.impl.ParticleEvent;
-import net.minecraft.entity.Entity;
-import net.minecraft.particle.ParticleEffect;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import thunder.hack.modules.Module;
+import thunder.hack.core.impl.ModuleManager;
+import thunder.hack.modules.render.NoRender;
 
 @Mixin(ParticleManager.class)
 public class MixinParticleManager {
     @Inject(at = @At("HEAD"), method = "addParticle(Lnet/minecraft/client/particle/Particle;)V", cancellable = true)
-    public void addParticleHook(Particle particle, CallbackInfo e) {
+    public void addParticleHook(Particle p, CallbackInfo e) {
+        NoRender nR = ModuleManager.noRender;
 
-        if (ModuleManager.noRender.elderGuardian.getValue() && particle instanceof ElderGuardianAppearanceParticle) e.cancel();
-        if (ModuleManager.noRender.explosions.getValue() && particle instanceof ExplosionLargeParticle) e.cancel();
-        if (ModuleManager.noRender.campFire.getValue() && particle instanceof CampfireSmokeParticle) e.cancel();
-        if (ModuleManager.noRender.breakParticles.getValue() && particle instanceof BlockDustParticle) e.cancel();
-        if (ModuleManager.noRender.fireworks.getValue() && (particle instanceof FireworksSparkParticle.FireworkParticle || particle instanceof FireworksSparkParticle.Flash)) e.cancel();
+        if(!nR.isEnabled())
+            return;
+        
+        if (nR.elderGuardian.getValue() && p instanceof ElderGuardianAppearanceParticle)
+            e.cancel();
+
+        if (nR.explosions.getValue() && p instanceof ExplosionLargeParticle)
+            e.cancel();
+
+        if (nR.campFire.getValue() && p instanceof CampfireSmokeParticle)
+            e.cancel();
+
+        if (nR.breakParticles.getValue() && p instanceof BlockDustParticle)
+            e.cancel();
+
+        if (nR.fireworks.getValue() && (p instanceof FireworksSparkParticle.FireworkParticle || p instanceof FireworksSparkParticle.Flash))
+            e.cancel();
     }
-
-
 }

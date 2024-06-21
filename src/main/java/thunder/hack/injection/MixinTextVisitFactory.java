@@ -1,5 +1,6 @@
 package thunder.hack.injection;
 
+import thunder.hack.core.impl.FriendManager;
 import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.modules.misc.NameProtect;
 import net.minecraft.text.TextVisitFactory;
@@ -20,8 +21,8 @@ public class MixinTextVisitFactory {
         if (!ModuleManager.nameProtect.isEnabled() || mc.player == null)
             return string;
         String me = mc.getSession().getUsername();
-        if (string.contains(me))
-            return string.replace(me, NameProtect.newName.getValue());
+        if (string.contains(me) || (FriendManager.friends.stream().anyMatch(i -> i.contains(string)) && NameProtect.hideFriends.getValue()))
+            return string.replace(me, NameProtect.getCustomName());
 
         return string;
     }

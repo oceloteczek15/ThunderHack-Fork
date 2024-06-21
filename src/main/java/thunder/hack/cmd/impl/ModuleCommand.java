@@ -12,8 +12,10 @@ import org.jetbrains.annotations.NotNull;
 import thunder.hack.ThunderHack;
 import thunder.hack.cmd.Command;
 import thunder.hack.cmd.args.ModuleArgumentType;
+import thunder.hack.cmd.args.SettingArgumentType;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
+import thunder.hack.setting.impl.BooleanSettingGroup;
 import thunder.hack.setting.impl.ColorSetting;
 import thunder.hack.setting.impl.EnumConverter;
 import thunder.hack.setting.impl.PositionSetting;
@@ -21,6 +23,7 @@ import thunder.hack.setting.impl.PositionSetting;
 import java.util.Objects;
 
 import static com.mojang.brigadier.Command.SINGLE_SUCCESS;
+import static thunder.hack.modules.client.ClientSettings.isRu;
 
 public class ModuleCommand extends Command {
     public ModuleCommand() {
@@ -49,11 +52,17 @@ public class ModuleCommand extends Command {
                     }
 
                     return SINGLE_SUCCESS;
-                })).then(arg("setting", StringArgumentType.word())
+                })).then(arg("setting", SettingArgumentType.create())
                         .then(arg("settingValue", StringArgumentType.greedyString()).executes(context -> {
                             Module module = context.getArgument("module", Module.class);
-                            Setting setting = module.getSettingByName(context.getArgument("setting", String.class));
+                            String settingName = context.getArgument("setting", String.class);
                             String settingValue = context.getArgument("settingValue", String.class);
+                            Setting setting = null;
+
+                            for(Setting set : module.getSettings()) {
+                                if(Objects.equals(set.getName(), settingName))
+                                    setting = set;
+                            }
 
                             if (setting == null) {
                                 sendMessage("No such setting");
@@ -61,9 +70,9 @@ public class ModuleCommand extends Command {
                             }
 
                             JsonParser jp = new JsonParser();
-                            if (setting.getType().equalsIgnoreCase("String")) {
+                            if (setting.getValue().getClass().getSimpleName().equalsIgnoreCase("String")) {
                                 setting.setValue(settingValue);
-                                sendMessage(Formatting.DARK_GRAY + module.getName() + " " + setting.getName() + " has been set to " + settingValue + ".");
+                                sendMessage(Formatting.DARK_GRAY + module.getName() + " " + setting.getName() + (isRu() ? " был выставлен " : " has been set to ") + settingValue);
                                 return SINGLE_SUCCESS;
                             }
                             try {
@@ -77,10 +86,15 @@ public class ModuleCommand extends Command {
                                 }
                                 setCommandValue(module, setting, jp.parse(settingValue));
                             } catch (Exception e) {
-                                sendMessage("Bad Value! This setting requires a: " + setting.getType() + " value.");
+                                sendMessage((isRu() ? "Неверное значение! Эта настройка требует тип: " : "Bad Value! This setting requires a: ") + setting.getValue().getClass().getSimpleName());
                                 return SINGLE_SUCCESS;
                             }
-                            sendMessage(Formatting.GRAY + module.getName() + " " + setting.getName() + " has been set to " + settingValue + ".");
+
+                            if(settingValue.contains("toggle"))
+                                sendMessage(Formatting.GRAY + module.getName() + " " + setting.getName() + (isRu() ? " был переключен" : " has been toggled"));
+                            else
+                                sendMessage(Formatting.GRAY + module.getName() + " " + setting.getName() + (isRu() ? " был выставлен " : " has been set to ") + settingValue);
+
                             return SINGLE_SUCCESS;
                         }))));
 
@@ -105,24 +119,33 @@ public class ModuleCommand extends Command {
         String str;
         for (Setting checkSetting : feature.getSettings()) {
             if (Objects.equals(setting.getName(), checkSetting.getName())) {
-                switch (checkSetting.getType()) {
-                    case "Parent", "Bind" -> {
+
+                sendMessage(checkSetting.getValue().getClass().getSimpleName());
+                switch (checkSetting.getValue().getClass().getSimpleName()) {
+                    case "SettingGroup", "Bind" -> {
                         return;
                     }
                     case "Boolean" -> {
-                        checkSetting.setValue(Boolean.valueOf(element.getAsBoolean()));
+                        if(element.getAsString().equals("toggle")) {
+                            checkSetting.setValue(!(boolean) checkSetting.getValue());
+                            return;
+                        }
+                        checkSetting.setValue(element.getAsBoolean());
                         return;
                     }
+                    case "BooleanSettingGroup" -> {
+                        ((BooleanSettingGroup) checkSetting.getValue()).setEnabled(element.getAsBoolean());
+                    }
                     case "Double" -> {
-                        checkSetting.setValue(Double.valueOf(element.getAsDouble()));
+                        checkSetting.setValue(element.getAsDouble());
                         return;
                     }
                     case "Float" -> {
-                        checkSetting.setValue(Float.valueOf(element.getAsFloat()));
+                        checkSetting.setValue(element.getAsFloat());
                         return;
                     }
                     case "Integer" -> {
-                        checkSetting.setValue(Integer.valueOf(element.getAsInt()));
+                        checkSetting.setValue(element.getAsInt());
                         return;
                     }
                     case "String" -> {
@@ -143,7 +166,7 @@ public class ModuleCommand extends Command {
                         ((PositionSetting) checkSetting.getValue()).setY(array3.get(1).getAsFloat());
                         return;
                     }
-                    case "Enum" -> {
+                    default -> {
                         try {
                             EnumConverter converter = new EnumConverter(((Enum) checkSetting.getValue()).getClass());
                             Enum value = converter.doBackward(element);

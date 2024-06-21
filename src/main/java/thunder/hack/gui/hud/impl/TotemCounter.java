@@ -28,8 +28,8 @@ public class TotemCounter extends HudElement {
         if(getItemCount(Items.TOTEM_OF_UNDYING) == 0)
             return;
 
-        int xPos = (int) ModuleManager.crosshair.getAnimatedPosX();
-        int yPos = (int) ModuleManager.crosshair.getAnimatedPosY();
+        float xPos = ModuleManager.crosshair.getAnimatedPosX();
+        float yPos = ModuleManager.crosshair.getAnimatedPosY();
 
         float factor = Math.abs(angle < 0 ? angle / 15f : 0f);
 
@@ -39,13 +39,15 @@ public class TotemCounter extends HudElement {
         context.getMatrices().translate(-xPos, -yPos, 0);
 
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        context.drawItem(Items.TOTEM_OF_UNDYING.getDefaultStack(), xPos - 36, yPos - 9);
+        context.getMatrices().translate(xPos - 36, yPos - 9, 0);
+        context.drawItem(Items.TOTEM_OF_UNDYING.getDefaultStack(), 0, 0);
+        context.getMatrices().translate(-(xPos - 36), -(yPos - 9), 0);
         RenderSystem.setShaderColor(1f, 1f - factor, 1f - factor, 1f);
 
         if(factor > 0)
             Render2DEngine.drawBlurredShadow(context.getMatrices(), xPos - 34, yPos - 6, 11, 11, 8, Render2DEngine.injectAlpha(new Color(0xFF0000), (int) (255 * factor)));
 
-        FontRenderers.sf_bold_mini.drawCenteredString(context.getMatrices(), getItemCount(Items.TOTEM_OF_UNDYING) + "",xPos - 28, yPos + 6, -1);
+        FontRenderers.sf_bold_mini.drawCenteredString(context.getMatrices(), getItemCount(Items.TOTEM_OF_UNDYING) + "",xPos - 28, yPos + 8, -1);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         context.getMatrices().pop();
     }

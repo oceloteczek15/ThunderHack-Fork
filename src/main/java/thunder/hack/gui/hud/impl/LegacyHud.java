@@ -7,10 +7,13 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Pair;
 import thunder.hack.ThunderHack;
-import thunder.hack.gui.font.FontAdapter;
+import thunder.hack.core.impl.ModuleManager;
+import thunder.hack.gui.font.FontRenderer;
 import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.modules.Module;
+import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
 import thunder.hack.utility.math.FrameRateCounter;
@@ -50,15 +53,18 @@ public class LegacyHud extends Module {
     private final Setting<Boolean> offhandDurability = new Setting<>("OffhandDurability", false);
     private final Setting<Boolean> mainhandDurability = new Setting<>("MainhandDurability", false);
     private final Setting<Boolean> fps = new Setting<>("FPS", false);
-    public Setting<Integer> waterMarkY = new Setting<>("WatermarkPosY", 2, 0, 20, v -> waterMark.getValue());
+    private final Setting<Boolean> chests = new Setting<>("Chests", false);
     public Setting<Boolean> time = new Setting<>("Time", false);
+
+
+    public Setting<Integer> waterMarkY = new Setting<>("WatermarkPosY", 2, 0, 20, v -> waterMark.getValue());
     private int color;
 
     private enum Font {
         Minecraft, Comfortaa, Monsterrat, SF
     }
 
-    public void onRenderShaders(DrawContext context) {
+    public void onRender2D(DrawContext context) {
         if (fullNullCheck())
             return;
 
@@ -108,7 +114,7 @@ public class LegacyHud extends Module {
         if (potions.getValue()) {
             List<StatusEffectInstance> effects = new ArrayList<>(mc.player.getStatusEffects());
             for (StatusEffectInstance potionEffect : effects) {
-                StatusEffect potion = potionEffect.getEffectType();
+                StatusEffect potion = potionEffect.getEffectType().value();
                 String power = "";
                 switch (potionEffect.getAmplifier()) {
                     case 0 -> power = "I";
@@ -119,12 +125,13 @@ public class LegacyHud extends Module {
                 }
                 String s = potion.getName().getString() + " " + power;
                 String s2 = getDuration(potionEffect) + "";
+                Color c = new Color(potionEffect.getEffectType().value().getColor());
 
                 if (renderingUp.getValue()) {
                     i += offset;
-                    drawText(context, s + " " + s2, (width - getStringWidth(s + " " + s2) - 2), (height - 2 - i), potionEffect.getEffectType().getColor());
+                    drawText(context, s + " " + s2, (width - getStringWidth(s + " " + s2) - 2), (height - 2 - i), c.getRGB());
                 } else {
-                    drawText(context, s + " " + s2, (width - getStringWidth(s + " " + s2) - 2), (2 + i++ * offset), potionEffect.getEffectType().getColor());
+                    drawText(context, s + " " + s2, (width - getStringWidth(s + " " + s2) - 2), (2 + i++ * offset), c.getRGB());
                 }
             }
         }
@@ -141,6 +148,12 @@ public class LegacyHud extends Module {
 
         if (speed.getValue()) {
             String str = "Speed " + Formatting.WHITE + MathUtility.round(ThunderHack.playerManager.currentPlayerSpeed * (bps.getValue() ? 20f : 72f) * ThunderHack.TICK_TIMER) + (bps.getValue() ? " b/s" : " km/h");
+            drawText(context, str, (width - getStringWidth(str) - 2), renderingUp.getValue() ? (height - 2 - (i += offset)) : (2 + i++ * offset));
+        }
+
+        if (chests.getValue()) {
+            Pair<Integer, Integer> chests = ModuleManager.chestCounter.getChestCount();
+            String str = "Chests: " + Formatting.WHITE + "S:" + chests.getLeft() + " D:" + chests.getRight();
             drawText(context, str, (width - getStringWidth(str) - 2), renderingUp.getValue() ? (height - 2 - (i += offset)) : (2 + i++ * offset));
         }
 
@@ -198,7 +211,7 @@ public class LegacyHud extends Module {
 
     private void drawText(DrawContext context, String str, int x, int y, int color) {
         if (!customFont.getValue().equals(Font.Minecraft)) {
-            FontAdapter adapter;
+            FontRenderer adapter;
             switch (customFont.getValue()) {
                 case Monsterrat -> {
                     adapter = FontRenderers.monsterrat;
@@ -219,7 +232,7 @@ public class LegacyHud extends Module {
 
     private void drawText(DrawContext context, String str, int x, int y) {
         if (!customFont.getValue().equals(Font.Minecraft)) {
-            FontAdapter adapter;
+            FontRenderer adapter;
             switch (customFont.getValue()) {
                 case Monsterrat -> {
                     adapter = FontRenderers.monsterrat;
@@ -280,7 +293,7 @@ public class LegacyHud extends Module {
             int x = i - 189 + 180 + 2;
             context.drawItem(totem, x, y);
             context.drawItemInSlot(mc.textRenderer, totem, x, y);
-            drawText(context, totems + "", x + 8 + getStringWidth(totems + "") / 2, (y - 7), 16777215);
+            drawText(context, totems + "", 8 + (int) (x - (float) getStringWidth(totems + "") / 2f), (y - 7), 16777215);
         }
     }
 

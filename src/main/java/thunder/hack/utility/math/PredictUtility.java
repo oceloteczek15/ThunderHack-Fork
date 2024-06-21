@@ -11,11 +11,24 @@ import java.util.UUID;
 import static thunder.hack.modules.Module.mc;
 
 public class PredictUtility {
+    public static PlayerEntity movePlayer(PlayerEntity entity, Vec3d newPos) {
+        if(entity == null || newPos == null)
+            return null;
+        return equipAndReturn(entity, newPos);
+    }
+
     public static PlayerEntity predictPlayer(PlayerEntity entity, int ticks) {
+        if(entity == null)
+            return null;
+
         Vec3d posVec = new Vec3d(entity.getX(), entity.getY(), entity.getZ());
         double motionX = entity.getX() - entity.prevX;
         double motionY = entity.getY() - entity.prevY;
         double motionZ = entity.getZ() - entity.prevZ;
+
+        // Можно въебать себя при спрыгивании с блока
+        if(entity == mc.player)
+            motionY = 0;
 
         for (int i = 0; i < ticks; i++) {
             if (!mc.world.isAir(BlockPos.ofFloored(posVec.add(0, motionY, 0)))) {

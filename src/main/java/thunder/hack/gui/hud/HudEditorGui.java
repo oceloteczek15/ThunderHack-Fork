@@ -7,12 +7,12 @@ import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import thunder.hack.ThunderHack;
-import thunder.hack.gui.clickui.AbstractWindow;
-import thunder.hack.gui.clickui.normal.ClickUI;
-import thunder.hack.gui.clickui.normal.ModuleWindow;
+import thunder.hack.core.impl.ModuleManager;
+import thunder.hack.gui.clickui.AbstractCategory;
+import thunder.hack.gui.clickui.Category;
+import thunder.hack.gui.clickui.ClickGUI;
 import thunder.hack.modules.Module;
 import thunder.hack.modules.client.ClickGui;
-import thunder.hack.utility.render.MSAAFramebuffer;
 
 import java.util.List;
 
@@ -20,7 +20,7 @@ import static thunder.hack.modules.Module.mc;
 
 public class HudEditorGui extends Screen {
     public static HudElement currentlyDragging;
-    private final List<AbstractWindow> windows;
+    private final List<AbstractCategory> windows;
     private static HudEditorGui instance = new HudEditorGui();
 
     private boolean firstOpen;
@@ -37,61 +37,44 @@ public class HudEditorGui extends Screen {
     @Override
     protected void init() {
         if (firstOpen) {
-            double x = 60, y = 20;
-            double offset = 0;
-            int windowHeight = 18;
-
-            for (final Module.Category category : ThunderHack.moduleManager.getCategories()) {
-                if (category != Module.Category.HUD) continue;
-                ModuleWindow window = new ModuleWindow(category, ThunderHack.moduleManager.getModulesByCategory(category), 0, x + offset, y, 108, windowHeight);
-                window.setOpen(true);
-                windows.add(window);
-                offset += 110;
-
-                if (offset > mc.getWindow().getScaledWidth()) {
-                    offset = 0;
-                }
-            }
-
+            Category window = new Category(Module.Category.HUD, ThunderHack.moduleManager.getModulesByCategory(Module.Category.HUD), mc.getWindow().getScaledWidth() / 2f - 50, 20f, 100f, 18f);
+            window.setOpen(true);
+            windows.add(window);
             firstOpen = false;
         }
+        windows.forEach(AbstractCategory::init);
+    }
 
-        windows.forEach(AbstractWindow::init);
+    @Override
+    public boolean shouldPause() {
+        return false;
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        ClickUI.anyHovered = false;
+        ClickGUI.anyHovered = false;
 
-        for (AbstractWindow window : windows) {
-            if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 264)) {
-                window.setY(window.getY() + 2);
+        if (ModuleManager.clickGui.scrollMode.getValue() == ClickGui.scrollModeEn.Old) {
+            for (AbstractCategory window : windows) {
+                if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 264))
+                    window.setY(window.getY() + 2);
+                if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 265))
+                    window.setY(window.getY() - 2);
+                if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 262))
+                    window.setX(window.getX() + 2);
+                if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 263))
+                    window.setX(window.getX() - 2);
+                if (dWheel != 0)
+                    window.setY((float) (window.getY() + dWheel));
             }
-            if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 265)) {
-                window.setY(window.getY() - 2);
-            }
-            if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 262)) {
-                window.setX(window.getX() + 2);
-            }
-            if (InputUtil.isKeyPressed(mc.getWindow().getHandle(), 263)) {
-                window.setX(window.getX() - 2);
-            }
-
-            if (dWheel != 0) window.setY(window.getY() + dWheel);
-        }
+        } else for (AbstractCategory window : windows)
+            if (dWheel != 0)
+                window.setModuleOffset((float) dWheel, mouseX, mouseY);
 
         dWheel = 0;
 
-        if (ClickGui.getInstance().msaa.getValue()) {
-            MSAAFramebuffer.use(true, () -> {
-                for (AbstractWindow window : windows) {
-                    window.render(context, mouseX, mouseY, delta, ClickGui.getInstance().mainColor.getValue().getColorObject());
-                }
-            });
-        } else {
-            for (AbstractWindow window : windows) {
-                window.render(context, mouseX, mouseY, delta, ClickGui.getInstance().mainColor.getValue().getColorObject());
-            }
+        for (AbstractCategory window : windows) {
+            window.render(context, mouseX, mouseY, delta);
         }
     }
 
@@ -136,6 +119,12 @@ public class HudEditorGui extends Screen {
     @Override
     public void removed() {
         ThunderHack.EVENT_BUS.unsubscribe(this);
+    }
+
+    public void hudClicked(Module module) {
+        for (AbstractCategory window : windows) {
+            window.hudClicked(module);
+        }
     }
 
     public static HudEditorGui getInstance() {

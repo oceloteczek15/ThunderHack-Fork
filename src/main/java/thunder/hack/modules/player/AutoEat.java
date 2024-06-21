@@ -1,11 +1,13 @@
 package thunder.hack.modules.player;
 
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.util.Hand;
 import org.jetbrains.annotations.NotNull;
+import thunder.hack.injection.accesors.IMinecraftClient;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
 
@@ -32,7 +34,7 @@ public class AutoEat extends Module {
             if(!isHandGood(Hand.MAIN_HAND) && !isHandGood(Hand.OFF_HAND)) {
                 for (int i = 0; i < 9; i++) {
                     ItemStack stack = mc.player.getInventory().getStack(i);
-                    if (stack.isFood()) {
+                    if (stack.getComponents().contains(DataComponentTypes.FOOD)) {
                         if (!gapple.getValue() && (stack.getItem() == Items.GOLDEN_APPLE || stack.getItem() == Items.ENCHANTED_GOLDEN_APPLE))
                             continue;
                         if (!chorus.getValue() && (stack.getItem() == Items.CHORUS_FRUIT))
@@ -51,7 +53,12 @@ public class AutoEat extends Module {
             }
 
             eating = true;
-            mc.options.useKey.setPressed(true);
+
+            if (mc.currentScreen != null && !mc.player.isUsingItem())
+                ((IMinecraftClient) mc).idoItemUse();
+            else
+                mc.options.useKey.setPressed(true);
+
         } else if (eating) {
             eating = false;
             mc.options.useKey.setPressed(false);
@@ -62,7 +69,7 @@ public class AutoEat extends Module {
         ItemStack stack = hand == Hand.MAIN_HAND ? mc.player.getMainHandStack() : mc.player.getOffHandStack();
 
         Item item = stack.getItem();
-        return stack.isFood()
+        return stack.getComponents().contains(DataComponentTypes.FOOD)
                 && (gapple.getValue() || (item != Items.GOLDEN_APPLE && item != Items.ENCHANTED_GOLDEN_APPLE))
                 && (chorus.getValue() || item != Items.CHORUS_FRUIT)
                 && (rottenFlesh.getValue() || item != Items.ROTTEN_FLESH)

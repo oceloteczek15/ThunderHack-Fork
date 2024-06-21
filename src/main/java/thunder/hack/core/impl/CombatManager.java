@@ -69,7 +69,7 @@ public class CombatManager implements IManager {
                 .filter(entityPlayer -> !ThunderHack.friendManager.isFriend(entityPlayer.getName().getString()))
                 .filter(entityPlayer -> entityPlayer != mc.player)
                 .filter(entityPlayer -> mc.player.squaredDistanceTo(entityPlayer) < range * range)
-                .sorted(Comparator.comparing(e -> mc.player.distanceTo(e)))
+                .sorted(Comparator.comparing(e -> mc.player.squaredDistanceTo(e)))
                 .collect(Collectors.toList());
     }
 
@@ -97,12 +97,15 @@ public class CombatManager implements IManager {
         return getTargets(range).stream().min(Comparator.comparing(this::getFOVAngle)).orElse(null);
     }
 
+    public PlayerEntity getTargetByFOV(float range, float fov) {
+        return getTargets(range).stream()
+                .filter(entityPlayer -> getFOVAngle(entityPlayer) < fov)
+                .min(Comparator.comparing(this::getFOVAngle)).orElse(null);
+    }
+
     private float getFOVAngle(@NotNull LivingEntity e) {
-        double difX = e.getX() - mc.player.getPos().x;
-        double difZ = e.getZ() - mc.player.getPos().z;
-        float yaw = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(difZ, difX)) - 90.0);
-        double plYaw = MathHelper.wrapDegrees(mc.player.getYaw());
-        return (float) Math.abs(yaw - plYaw);
+        float yaw = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(e.getZ() - mc.player.getZ(), e.getX() - mc.player.getX())) - 90.0);
+        return Math.abs(yaw - MathHelper.wrapDegrees(mc.player.getYaw()));
     }
 
     public enum TargetBy {

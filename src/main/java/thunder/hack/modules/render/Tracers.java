@@ -24,8 +24,6 @@ public class Tracers extends Module {
 
 
     public void onRender3D(MatrixStack stack) {
-        boolean prevBob = mc.options.getBobView().getValue();
-        mc.options.getBobView().setValue(false);
 
         for (PlayerEntity player : ThunderHack.asyncManager.getAsyncPlayers()) {
             if (player == mc.player)
@@ -36,18 +34,20 @@ public class Tracers extends Module {
             if (ThunderHack.friendManager.isFriend(player))
                 color1 = friendColor.getValue().getColorObject();
 
+            double x1 = mc.player.prevX + (mc.player.getX() - mc.player.prevX) * mc.getTickDelta();
+            double y1 = mc.player.getEyeHeight(mc.player.getPose()) + mc.player.prevY + (mc.player.getY() - mc.player.prevY) * mc.getTickDelta();
+            double z1 = mc.player.prevZ + (mc.player.getZ() - mc.player.prevZ) * mc.getTickDelta();
+
             Vec3d vec2 = new Vec3d(0, 0, 75)
                     .rotateX(-(float) Math.toRadians(mc.gameRenderer.getCamera().getPitch()))
                     .rotateY(-(float) Math.toRadians(mc.gameRenderer.getCamera().getYaw()))
-                    .add(mc.cameraEntity.getEyePos());
+                    .add(x1, y1, z1);
 
             double x = player.prevX + (player.getX() - player.prevX) * mc.getTickDelta();
             double y = player.prevY + (player.getY() - player.prevY) * mc.getTickDelta();
             double z = player.prevZ + (player.getZ() - player.prevZ) * mc.getTickDelta();
 
-            Render3DEngine.drawLineDebug(vec2.x, vec2.y, vec2.z, x, y + height.getValue(), z, color1, 1f);
+            Render3DEngine.drawLineDebug(vec2, new Vec3d(x, y + height.getValue(), z), color1);
         }
-
-        mc.options.getBobView().setValue(prevBob);
     }
 }

@@ -1,21 +1,20 @@
 package thunder.hack.modules.movement;
 
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.projectile.FishingBobberEntity;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.common.CommonPingS2CPacket;
 import net.minecraft.network.packet.s2c.play.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
 import thunder.hack.core.impl.ModuleManager;
-import thunder.hack.events.impl.EventSync;
+import thunder.hack.events.impl.EventMove;
 import thunder.hack.events.impl.PacketEvent;
 import thunder.hack.injection.accesors.IExplosionS2CPacket;
 import thunder.hack.injection.accesors.ISPacketEntityVelocity;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.Parent;
 import thunder.hack.utility.player.MovementUtility;
 
 public class Velocity extends Module {
@@ -25,17 +24,11 @@ public class Velocity extends Module {
     https://github.com/SkidderMC/FDPClient/blob/main/src/main/java/net/ccbluex/liquidbounce/features/module/modules/combat/velocitys/vanilla/JumpVelocity.kt
      */
 
-    public Setting<Boolean> onlyAura = new Setting<>("OnlyAura", false);
-    public Setting<Boolean> pauseInWater = new Setting<>("PauseInFluids", false);
+    public Setting<Boolean> onlyAura = new Setting<>("OnlyDuringAura", false);
+    public Setting<Boolean> pauseInWater = new Setting<>("PauseInLiquids", false);
     public Setting<Boolean> explosions = new Setting<>("Explosions", true);
-    public Setting<Boolean> autoDisable = new Setting<>("DisableOnVerify", false);
-    public Setting<Boolean> cc = new Setting<>("CC", false);
-    public Setting<Boolean> fishingHook = new Setting<>("FishingHook", true);
-    public Setting<Boolean> fire = new Setting<>("PauseFire", false);
-    public static Setting<Parent> antiPush = new Setting<>("AntiPush", new Parent(false, 0));
-    public Setting<Boolean> blocks = new Setting<>("Blocks", true).withParent(antiPush);
-    public Setting<Boolean> players = new Setting<>("Players", true).withParent(antiPush);
-    public Setting<Boolean> water = new Setting<>("Water", true).withParent(antiPush);
+    public Setting<Boolean> cc = new Setting<>("PauseOnFlag", false);
+    public Setting<Boolean> fire = new Setting<>("PauseOnFire", false);
     private final Setting<modeEn> mode = new Setting<>("Mode", modeEn.Matrix);
     public Setting<Float> vertical = new Setting<>("Vertical", 0.0f, 0.0f, 100.0f, v -> mode.getValue() == modeEn.Custom);
     private final Setting<jumpModeEn> jumpMode = new Setting<>("JumpMode", jumpModeEn.Jump, v -> mode.getValue() == modeEn.Jump);
@@ -66,21 +59,6 @@ public class Velocity extends Module {
         if (ccCooldown > 0) {
             ccCooldown--;
             return;
-        }
-
-        if (e.getPacket() instanceof GameMessageS2CPacket && autoDisable.getValue()) {
-            String text = ((GameMessageS2CPacket) e.getPacket()).content().getString();
-            if (text.contains("Тебя проверяют на чит АКБ, ник хелпера - ")) disable(":^)");
-        }
-
-        if (e.getPacket() instanceof EntityStatusS2CPacket pac
-                && pac.getStatus() == 31
-                && pac.getEntity(mc.world) instanceof FishingBobberEntity
-                && fishingHook.getValue()) {
-            FishingBobberEntity fishHook = (FishingBobberEntity) pac.getEntity(mc.world);
-            if (fishHook.getHookedEntity() == mc.player) {
-                e.cancel();
-            }
         }
 
         // MAIN VELOCITY
@@ -137,6 +115,7 @@ public class Velocity extends Module {
 
         // EXPLOSION
         if (e.getPacket() instanceof ExplosionS2CPacket explosion && explosions.getValue()) {
+
             switch (mode.getValue()) {
                 case Cancel -> {
                     ((IExplosionS2CPacket) explosion).setMotionX(0);
@@ -149,7 +128,9 @@ public class Velocity extends Module {
                     ((IExplosionS2CPacket) explosion).setMotionY(((IExplosionS2CPacket) explosion).getMotionY() * vertical.getValue() / 100f);
                 }
                 case GrimNew -> {
-                    e.cancel();
+                    ((IExplosionS2CPacket) explosion).setMotionX(0);
+                    ((IExplosionS2CPacket) explosion).setMotionY(0);
+                    ((IExplosionS2CPacket) explosion).setMotionZ(0);
                     flag = true;
                 }
             }
@@ -228,6 +209,10 @@ public class Velocity extends Module {
         }
         if (grimTicks > 0)
             grimTicks--;
+    }
+
+    private boolean isValidMotion(double motion, double min, double max) {
+        return Math.abs(motion) > min && Math.abs(motion) < max;
     }
 
     @Override

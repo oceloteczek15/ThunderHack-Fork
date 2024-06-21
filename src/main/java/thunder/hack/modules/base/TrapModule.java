@@ -20,10 +20,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public abstract class TrapModule extends IndestructibleModule {
+public abstract class TrapModule extends PlaceModule {
     protected final Setting<PlaceTiming> placeTiming = new Setting<>("Place Timing", PlaceTiming.Default);
     protected final Setting<Integer> blocksPerTick = new Setting<>("Block/Tick", 8, 1, 12, v -> placeTiming.getValue() == PlaceTiming.Default);
-    protected final Setting<Integer> placeDelay = new Setting<>("Delay/Place", 3, 0, 10, v -> placeTiming.getValue() != PlaceTiming.Sequential);
+    protected final Setting<Integer> placeDelay = new Setting<>("Delay/Place", 3, 0, 10);
     protected final Setting<TrapMode> trapMode = new Setting<>("Trap Mode", TrapMode.Full);
 
     private int delay;
@@ -53,7 +53,7 @@ public abstract class TrapModule extends IndestructibleModule {
             return;
         }
 
-        if (placeTiming.getValue() == PlaceTiming.Vanilla && rotate.getValue()) {
+        if (placeTiming.getValue() == PlaceTiming.Vanilla && !rotate.is(InteractionUtility.Rotate.None)) {
             BlockPos targetBlock = getBlockToPlace();
             if (targetBlock != null && mc.player != null) {
                 BlockHitResult result = InteractionUtility.getPlaceResult(targetBlock, interact.getValue(), false);
@@ -61,7 +61,6 @@ public abstract class TrapModule extends IndestructibleModule {
                     float[] angle = InteractionUtility.calculateAngle(result.getPos());
                     mc.player.setYaw(angle[0]);
                     mc.player.setPitch(angle[1]);
-
                 }
             }
         }
@@ -75,43 +74,29 @@ public abstract class TrapModule extends IndestructibleModule {
             return;
         }
 
+        InteractionUtility.Rotate rotateMod = placeTiming.is(PlaceTiming.Vanilla) && !rotate.is(InteractionUtility.Rotate.None) ? InteractionUtility.Rotate.None : rotate.getValue();
+
         if (placeTiming.getValue() == PlaceTiming.Default) {
             int placed = 0;
             while (placed < blocksPerTick.getValue()) {
                 BlockPos targetBlock = getBlockToPlace();
                 if (targetBlock == null)
                     break;
-                if (placeBlock(targetBlock)) {
+                if (placeBlock(targetBlock, rotateMod)) {
                     placed++;
                     delay = placeDelay.getValue();
                     inactivityTimer.reset();
-                } else break;
+                } else
+                    break;
             }
-        } else if (placeTiming.getValue() == PlaceTiming.Vanilla || placeTiming.getValue() == PlaceTiming.Sequential) {
+        } else if (placeTiming.getValue() == PlaceTiming.Vanilla) {
             BlockPos targetBlock = getBlockToPlace();
 
             if (targetBlock != null) {
-                if (placeBlock(targetBlock)) {
+                if (placeBlock(targetBlock, rotateMod)) {
                     sequentialBlocks.add(targetBlock);
                     delay = placeDelay.getValue();
                     inactivityTimer.reset();
-                }
-            }
-        }
-    }
-
-    @EventHandler
-    @SuppressWarnings("unused")
-    private void onPacketReceive(PacketEvent.@NotNull Receive event) {
-        if (event.getPacket() instanceof BlockUpdateS2CPacket pac) {
-            if (placeTiming.getValue() == PlaceTiming.Sequential && !sequentialBlocks.isEmpty()) {
-                if (sequentialBlocks.contains(pac.getPos())) {
-                    BlockPos bp = getBlockToPlace();
-                    if (bp != null && placeBlock(bp)) {
-                        sequentialBlocks.add(bp);
-                        sequentialBlocks.remove(pac.getPos());
-                        inactivityTimer.reset();
-                    }
                 }
             }
         }
@@ -139,22 +124,26 @@ public abstract class TrapModule extends IndestructibleModule {
                 offsets.addAll(holePoses.stream()
                         .map(BlockPos::down)
                         .toList());
+
                 if (interact.getValue() != InteractionUtility.Interact.AirPlace)
                     offsets.addAll(addHelpOffsets(surroundPoses));
+
                 offsets.addAll(surroundPoses);
                 offsets.addAll(surroundPoses.stream()
                         .map(BlockPos::up)
                         .toList());
+
                 if (interact.getValue() != InteractionUtility.Interact.AirPlace) {
                     surroundPoses.stream()
                             .map(pos -> pos.up(2))
                             .filter(pos -> pos.getSquaredDistance(mc.player.getPos()) < range.getPow2Value())
-                            .max(Comparator.comparing(pos -> player.squaredDistanceTo(pos.toCenterPos())))
+                            .max(Comparator.comparing(pos -> mc.player.squaredDistanceTo(pos.toCenterPos())))
                             .ifPresent(pos -> {
                                 offsets.add(pos);
                                 offsets.add(pos.down());
                             });
                 }
+
                 offsets.addAll(holePoses.stream()
                         .map(pos -> pos.up(2))
                         .toList());
@@ -236,7 +225,6 @@ public abstract class TrapModule extends IndestructibleModule {
 
     protected enum PlaceTiming {
         Default,
-        Vanilla,
-        Sequential
+        Vanilla
     }
 }

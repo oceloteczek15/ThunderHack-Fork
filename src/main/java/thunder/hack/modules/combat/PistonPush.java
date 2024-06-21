@@ -16,7 +16,7 @@ import thunder.hack.injection.accesors.IClientPlayerEntity;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.player.InteractionUtility;
 import thunder.hack.utility.player.InventoryUtility;
 import thunder.hack.utility.player.SearchInvResult;
@@ -40,10 +40,10 @@ public final class PistonPush extends Module {
     private final Setting<Boolean> autoSwap = new Setting<>("Auto Swap", true);
     private final Setting<Boolean> swing = new Setting<>("Swing", true);
 
-    private final Setting<Parent> render = new Setting<>("Render", new Parent(false, 0));
-    private final Setting<ColorSetting> fillColor = new Setting<>("Fill Color", new ColorSetting(new Color(255, 0, 0, 50))).withParent(render);
-    private final Setting<ColorSetting> lineColor = new Setting<>("Line Color", new ColorSetting(new Color(255, 0, 0, 200))).withParent(render);
-    private final Setting<Integer> lineWidth = new Setting<>("Line Width", 2, 1, 5).withParent(render);
+    private final Setting<SettingGroup> render = new Setting<>("Render", new SettingGroup(false, 0));
+    private final Setting<ColorSetting> fillColor = new Setting<>("Fill Color", new ColorSetting(new Color(255, 0, 0, 50))).addToGroup(render);
+    private final Setting<ColorSetting> lineColor = new Setting<>("Line Color", new ColorSetting(new Color(255, 0, 0, 200))).addToGroup(render);
+    private final Setting<Integer> lineWidth = new Setting<>("Line Width", 2, 1, 5).addToGroup(render);
 
     private PlayerEntity target;
     private BlockPos pistonPos;
@@ -53,15 +53,8 @@ public final class PistonPush extends Module {
 
     private final ConcurrentHashMap<BlockPos, Long> renderPoses = new ConcurrentHashMap<>();
 
-    private static PistonPush instance;
-
     public PistonPush() {
         super("PistonPush", Category.COMBAT);
-        instance = this;
-    }
-
-    public static PistonPush getInstance() {
-        return instance;
     }
 
     @Override
@@ -155,7 +148,7 @@ public final class PistonPush extends Module {
 
         placeRunnable = () -> {
             int prevSlot = mc.player.getInventory().selectedSlot;
-            InteractionUtility.placeBlock(chargePos, false, interact.getValue(), placeMode.getValue(), getChargeSlot(), true, false);
+            InteractionUtility.placeBlock(chargePos, InteractionUtility.Rotate.None, interact.getValue(), placeMode.getValue(), getChargeSlot(), true, false);
             sendPacket(new UpdateSelectedSlotC2SPacket(prevSlot));
             mc.player.getInventory().selectedSlot = prevSlot;
             firstPlace = true;
@@ -192,7 +185,7 @@ public final class PistonPush extends Module {
             mc.player.prevYaw = angle;
             ((IClientPlayerEntity) mc.player).setLastYaw(angle);
             int prevSlot = mc.player.getInventory().selectedSlot;
-            InteractionUtility.placeBlock(pistonPos, false, interact.getValue(), placeMode.getValue(), getPistonSlot(), true, false);
+            InteractionUtility.placeBlock(pistonPos, InteractionUtility.Rotate.None, interact.getValue(), placeMode.getValue(), getPistonSlot(), true, false);
             sendPacket(new UpdateSelectedSlotC2SPacket(prevSlot));
             mc.player.getInventory().selectedSlot = prevSlot;
             mc.player.setYaw(prevYaw);

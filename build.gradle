@@ -1,10 +1,10 @@
 plugins {
-	id 'fabric-loom' version '1.5-SNAPSHOT'
+	id 'fabric-loom' version '1.6-SNAPSHOT'
 	id 'maven-publish'
 }
 
-sourceCompatibility = JavaVersion.VERSION_17
-targetCompatibility = JavaVersion.VERSION_17
+sourceCompatibility = JavaVersion.VERSION_21
+targetCompatibility = JavaVersion.VERSION_21
 
 archivesBaseName = project.archives_base_name
 version = project.mod_version
@@ -26,6 +26,10 @@ repositories {
 	maven {
 		name = "meteor-maven"
 		url = "https://maven.meteordev.org/releases"
+	}
+	maven {
+		name = "meteor-maven-snapshots"
+		url = "https://maven.meteordev.org/snapshots"
 	}
 	repositories {
 		maven {
@@ -57,6 +61,8 @@ dependencies {
 
 	libImpl("meteordevelopment:orbit:${project.orbit_version}")
 
+	modCompileOnly "meteordevelopment:baritone:1.20.6-SNAPSHOT"
+
 	configurations.libImpl.dependencies.each {
 		implementation(it)
 	}
@@ -75,7 +81,7 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 17
+	it.options.release = 21
 }
 
 java {
@@ -90,6 +96,16 @@ jar {
 		configurations.libImpl.collect { it.isDirectory() ? it : zipTree(it) }
 	}
 	duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+
+	manifest {
+        	attributes(
+            	'Implementation-Title': project.name,
+            	'Implementation-Version': project.version,
+            	'Built-By': System.getProperty('user.name'),
+            	'Build-Timestamp': new Date(),
+            	'Git-Commit': gitCommitHash()
+        	)
+    	}
 }
 
 publishing {
@@ -101,4 +117,13 @@ publishing {
 
 	repositories {
 	}
+}
+
+def gitCommitHash() {
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-parse', '--short', 'HEAD'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
 }

@@ -6,6 +6,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
@@ -25,6 +26,7 @@ import thunder.hack.cmd.Command;
 import thunder.hack.core.impl.FriendManager;
 import thunder.hack.core.impl.MacroManager;
 import thunder.hack.core.impl.ModuleManager;
+import thunder.hack.core.impl.ServerManager;
 import thunder.hack.events.impl.*;
 import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.gui.notification.Notification;
@@ -45,7 +47,8 @@ import static thunder.hack.modules.client.ClientSettings.isRu;
 public final class Core {
     public static boolean lockSprint, serverSprint, hold_mouse0, showSkull;
     public static final Map<String, Identifier> HEADS = new ConcurrentHashMap<>();
-    private final Identifier SKULL = new Identifier("textures/skull.png");
+    public ArrayList<Packet<?>> silentPackets = new ArrayList<>();
+    private final Identifier SKULL = new Identifier("thunderhack", "textures/hud/elements/skull.png");
     private final Timer skullTimer = new Timer();
     private final Timer lastPacket = new Timer();
     private final Timer autoSave = new Timer();
@@ -62,19 +65,20 @@ public final class Core {
 
         if (ModuleManager.clickGui.getBind().getKey() == -1) {
             Command.sendMessage(Formatting.RED + "Default clickgui keybind --> P");
+            Command.sendMessage(Formatting.RED + "You can get pre built config using command -> @cfg cloudlist");
             ModuleManager.clickGui.setBind(InputUtil.fromTranslationKey("key.keyboard.p").getCode(), false, false);
         }
 
         for (PlayerEntity p : mc.world.getPlayers()) {
             if (p.isDead() || p.getHealth() == 0)
-                ThunderHack.EVENT_BUS.post(new DeathEvent(p));
+                ThunderHack.EVENT_BUS.post(new EventDeath(p));
         }
 
         if (!Objects.equals(ThunderHack.commandManager.getPrefix(), ClientSettings.prefix.getValue().toString()))
             ThunderHack.commandManager.setPrefix(ClientSettings.prefix.getValue());
 
         new HashMap<>(InteractionUtility.awaiting).forEach((bp, time) -> {
-            if (System.currentTimeMillis() - time > 300)
+            if (System.currentTimeMillis() - time > ServerManager.getPing() * 2f)
                 InteractionUtility.awaiting.remove(bp);
         });
 
@@ -83,8 +87,6 @@ public final class Core {
             ThunderHack.configManager.save(ThunderHack.configManager.getCurrentConfig());
             ThunderHack.wayPointManager.saveWayPoints();
             ThunderHack.macroManager.saveMacro();
-            ThunderHack.configManager.saveChestStealer();
-            ThunderHack.configManager.saveInvCleaner();
             ThunderHack.notificationManager.publicity("AutoSave", isRu() ? "Сохраняю конфиг.." : "Saving config..", 3, Notification.Type.INFO);
         }
     }
@@ -112,7 +114,7 @@ public final class Core {
     @EventHandler
     public void onSync(EventSync event) {
         if (fullNullCheck()) return;
-        thunder.hack.modules.movement.Timer.onEntitySync(event);
+        ModuleManager.timer.onEntitySync();
     }
 
     public void onRender2D(DrawContext e) {
@@ -144,13 +146,12 @@ public final class Core {
                 ThunderHack.configManager.save(ThunderHack.configManager.getCurrentConfig());
                 ThunderHack.wayPointManager.saveWayPoints();
                 ThunderHack.macroManager.saveMacro();
-                ThunderHack.configManager.saveChestStealer();
-                ThunderHack.configManager.saveInvCleaner();
                 ThunderHack.notificationManager.publicity("AutoSave", isRu() ? "Сохраняю конфиг.." : "Saving config..", 3, Notification.Type.INFO);
             }
         }
     }
 
+    /*
     @EventHandler
     @SuppressWarnings("unused")
     public void onEntitySpawn(EventEntitySpawn e) {
@@ -159,12 +160,13 @@ public final class Core {
                 InteractionUtility.awaiting.remove(bp);
         });
     }
+     */
 
     public void drawSkull(DrawContext e) {
         if (showSkull && !skullTimer.passedMs(3000) && ClientSettings.skullEmoji.getValue()) {
             int xPos = (int) (mc.getWindow().getScaledWidth() / 2f - 150);
             int yPos = (int) (mc.getWindow().getScaledHeight() / 2f - 150);
-            float alpha = (1 - (skullTimer.getPassedTimeMs() / 3000f));
+            float alpha = (1f - (skullTimer.getPassedTimeMs() / 3000f));
             RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
             e.drawTexture(SKULL, xPos, yPos, 0, 0, 300, 300, 300, 300);
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
@@ -195,11 +197,9 @@ public final class Core {
     @EventHandler
     public void onKeyPress(EventKeyPress event) {
         if (event.getKey() == -1) return;
-        for (MacroManager.Macro m : ThunderHack.macroManager.getMacros()) {
-            if (m.bind() == event.getKey()) {
+        for (MacroManager.Macro m : ThunderHack.macroManager.getMacros())
+            if (m.getBind() == event.getKey())
                 m.runMacro();
-            }
-        }
     }
 
     @EventHandler

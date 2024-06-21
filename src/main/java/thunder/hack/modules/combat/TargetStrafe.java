@@ -2,7 +2,10 @@ package thunder.hack.modules.combat;
 
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Blocks;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
@@ -10,6 +13,8 @@ import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import thunder.hack.ThunderHack;
 import thunder.hack.core.Core;
 import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.events.impl.*;
@@ -17,6 +22,10 @@ import thunder.hack.injection.accesors.ISPacketEntityVelocity;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
 import thunder.hack.utility.player.InventoryUtility;
+import thunder.hack.utility.player.MovementUtility;
+import thunder.hack.utility.render.Render3DEngine;
+
+import java.awt.*;
 
 import static thunder.hack.utility.player.MovementUtility.isMoving;
 
@@ -103,7 +112,7 @@ public class TargetStrafe extends Module {
         if (mc.player.isOnGround()) {
             n8 = speedAttributes * n7;
             if (move.getY() > 0) {
-                n8 += boost.getValue() == Boost.Elytra && InventoryUtility.getElytra() != -1 && disabled ? 0.65 : 0.2f;
+                n8 += boost.getValue() == Boost.Elytra && InventoryUtility.getElytra() != -1 && disabled ? 0.65f : 0.2f;
             }
             disabled = false;
         } else {
@@ -272,11 +281,5 @@ public class TargetStrafe extends Module {
 
     private enum Boost {
         None, Elytra, Damage
-    }
-
-    private static float getFrictionFactor() {
-        BlockPos.Mutable bp = new BlockPos.Mutable();
-        bp.set(mc.player.prevX, mc.player.getBoundingBox().minY - 0.8D, mc.player.prevZ);
-        return mc.world.getBlockState(bp).getBlock().getSlipperiness() * 0.91F;
     }
 }

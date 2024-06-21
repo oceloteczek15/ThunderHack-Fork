@@ -4,6 +4,7 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Block;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.RaycastContext;
@@ -11,12 +12,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 import thunder.hack.ThunderHack;
 import thunder.hack.core.impl.ModuleManager;
-import thunder.hack.events.impl.EventSync;
+import thunder.hack.events.impl.EventTick;
 import thunder.hack.modules.Module;
 import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.math.PredictUtility;
 import thunder.hack.utility.player.InteractionUtility;
 import thunder.hack.utility.Timer;
@@ -34,7 +35,7 @@ import java.util.*;
 import static thunder.hack.modules.client.ClientSettings.isRu;
 
 public final class HoleFill extends Module {
-    private final Setting<Boolean> rotate = new Setting<>("Rotate", true);
+    private final Setting<InteractionUtility.Rotate> rotate = new Setting<>("Rotate", InteractionUtility.Rotate.None);
     private final Setting<InteractionUtility.Interact> interactMode = new Setting<>("Interact Mode", InteractionUtility.Interact.Vanilla);
     private final Setting<Float> placeRange = new Setting<>("Range", 5f, 1f, 6f);
     private final Setting<Float> placeWallRange = new Setting<>("WallRange", 5f, 1f, 6f);
@@ -43,24 +44,24 @@ public final class HoleFill extends Module {
     private final Setting<Boolean> jumpDisable = new Setting<>("Jump Disable", false);
     private final Setting<FillBlocks> blocks = new Setting<>("Blocks", FillBlocks.All);
 
-    private final Setting<Parent> fill = new Setting<>("Fill Holes", new Parent(true, 0));
-    private final Setting<Boolean> selfFill = new Setting<>("Self Fill", false).withParent(fill);
-    private final Setting<SelfFillMode> selfFillMode = new Setting<>("Self Fill Mode", SelfFillMode.Burrow).withParent(fill);
-    private final Setting<Boolean> fillSingle = new Setting<>("Single", true).withParent(fill);
-    private final Setting<Boolean> fillDouble = new Setting<>("Double", false).withParent(fill);
-    private final Setting<Boolean> fillQuad = new Setting<>("Quad", false).withParent(fill);
+    private final Setting<SettingGroup> fill = new Setting<>("Fill Holes", new SettingGroup(true, 0));
+    private final Setting<Boolean> selfFill = new Setting<>("Self Fill", false).addToGroup(fill);
+    private final Setting<SelfFillMode> selfFillMode = new Setting<>("Self Fill Mode", SelfFillMode.Burrow).addToGroup(fill);
+    private final Setting<Boolean> fillSingle = new Setting<>("Single", true).addToGroup(fill);
+    private final Setting<Boolean> fillDouble = new Setting<>("Double", false).addToGroup(fill);
+    private final Setting<Boolean> fillQuad = new Setting<>("Quad", false).addToGroup(fill);
 
     private final Setting<Mode> mode = new Setting<>("Mode", Mode.Always);
     private final Setting<Float> rangeToTarget = new Setting<>("Range To Target", 2f, 1f, 5f, v -> mode.getValue() == Mode.Target);
     private final Setting<Boolean> autoDisable = new Setting<>("Auto Disable", false);
     private final Setting<InteractionUtility.PlaceMode> placeMode = new Setting<>("Place Mode", InteractionUtility.PlaceMode.Packet);
 
-    private final Setting<Parent> renderCategory = new Setting<>("Render", new Parent(false, 0));
-    private final Setting<BlockAnimationUtility.BlockRenderMode> renderMode = new Setting<>("Render Mode", BlockAnimationUtility.BlockRenderMode.All).withParent(renderCategory);
-    private final Setting<BlockAnimationUtility.BlockAnimationMode> animationMode = new Setting<>("Animation Mode", BlockAnimationUtility.BlockAnimationMode.Fade).withParent(renderCategory);
-    private final Setting<ColorSetting> renderFillColor = new Setting<>("Render Fill Color", new ColorSetting(HudEditor.getColor(0))).withParent(renderCategory);
-    private final Setting<ColorSetting> renderLineColor = new Setting<>("Render Line Color", new ColorSetting(HudEditor.getColor(0))).withParent(renderCategory);
-    private final Setting<Integer> renderLineWidth = new Setting<>("Render Line Width", 2, 1, 5).withParent(renderCategory);
+    private final Setting<SettingGroup> renderCategory = new Setting<>("Render", new SettingGroup(false, 0));
+    private final Setting<BlockAnimationUtility.BlockRenderMode> renderMode = new Setting<>("Render Mode", BlockAnimationUtility.BlockRenderMode.All).addToGroup(renderCategory);
+    private final Setting<BlockAnimationUtility.BlockAnimationMode> animationMode = new Setting<>("Animation Mode", BlockAnimationUtility.BlockAnimationMode.Fade).addToGroup(renderCategory);
+    private final Setting<ColorSetting> renderFillColor = new Setting<>("Render Fill Color", new ColorSetting(HudEditor.getColor(0))).addToGroup(renderCategory);
+    private final Setting<ColorSetting> renderLineColor = new Setting<>("Render Line Color", new ColorSetting(HudEditor.getColor(0))).addToGroup(renderCategory);
+    private final Setting<Integer> renderLineWidth = new Setting<>("Render Line Width", 2, 1, 5).addToGroup(renderCategory);
 
     private enum Mode {
         Always,
@@ -90,11 +91,9 @@ public final class HoleFill extends Module {
     public static final Timer inactivityTimer = new Timer();
     private int tickCounter = 0;
     private boolean selfFillNeed = false;
-    private static HoleFill instance;
 
     public HoleFill() {
         super("HoleFill", Category.COMBAT);
-        instance = this;
     }
 
     @Override
@@ -104,7 +103,7 @@ public final class HoleFill extends Module {
     }
 
     @EventHandler
-    public void onSync(EventSync event) {
+    public void onTick(EventTick event) {
         if (fullNullCheck()) return;
         if (jumpDisable.getValue() && mc.player.prevY < mc.player.getY())
             disable(isRu() ? "Вы прыгнули! Выключаю..." : "You jumped! Disabling...");
@@ -125,8 +124,9 @@ public final class HoleFill extends Module {
                 .min(Comparator.comparing(e -> mc.player.squaredDistanceTo(e)))
                 .orElse(null);
 
-        if (mode.getValue() == Mode.Target && target == null) return;
-        if(target == null) return;
+        if (mode.getValue() == Mode.Target && target == null)
+            return;
+
         final PlayerEntity predicted = PredictUtility.predictPlayer(target, 3);
 
         int blocksPlaced = 0;
@@ -279,7 +279,17 @@ public final class HoleFill extends Module {
             for (int j = centerPos.getY() - h; j < centerPos.getY() + h; j++) {
                 for (int k = centerPos.getZ() - r; k < centerPos.getZ() + r; k++) {
                     BlockPos pos = new BlockPos(i, j, k);
+                    boolean foundEntity = false;
                     if (isHole(pos) && !isFillingNow(pos)) {
+                        for(PlayerEntity pe : ThunderHack.asyncManager.getAsyncPlayers()) {
+                            if(new Box(pos).offset(-1,0,-1).expand(2,-0.3,2).intersects(pe.getBoundingBox())) {
+                                foundEntity = true;
+                                break;
+                            }
+                        }
+                        if(foundEntity)
+                            continue;
+
                         BlockHitResult wallCheck = mc.world.raycast(new RaycastContext(InteractionUtility.getEyesPos(mc.player), pos.toCenterPos().offset(Direction.UP, 0.5f), RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player));
                         if (wallCheck != null && wallCheck.getType() == HitResult.Type.BLOCK && wallCheck.getBlockPos() != pos)
                             if (InteractionUtility.squaredDistanceFromEyes(pos.toCenterPos()) > placeWallRange.getPow2Value())
@@ -340,9 +350,5 @@ public final class HoleFill extends Module {
         return ((HoleUtility.validTwoBlockIndestructible(pos) || HoleUtility.validTwoBlockBedrock(pos)) && fillDouble.getValue())
                 || ((HoleUtility.validQuadBedrock(pos) || HoleUtility.validQuadIndestructible(pos)) && fillQuad.getValue())
                 || ((HoleUtility.validBedrock(pos) || HoleUtility.validIndestructible(pos)) && fillSingle.getValue());
-    }
-
-    public static HoleFill getInstance() {
-        return instance;
     }
 }

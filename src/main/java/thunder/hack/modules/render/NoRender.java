@@ -3,6 +3,7 @@ package thunder.hack.modules.render;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.entity.projectile.thrown.EggEntity;
@@ -28,6 +29,7 @@ public class NoRender extends Module {
     }
 
     public final Setting<Boolean> auto = new Setting<>("Auto", false);
+    public final Setting<Boolean> hurtCam = new Setting<>("HurtCam", true);
     public final Setting<Boolean> potions = new Setting<>("Potions", false);
     public final Setting<Boolean> xp = new Setting<>("XP", false);
     public final Setting<Boolean> arrows = new Setting<>("Arrows", false);
@@ -56,6 +58,7 @@ public class NoRender extends Module {
     public final Setting<Boolean> noScoreBoard = new Setting<>("NoScoreBoard", true);
     public final Setting<Boolean> signText = new Setting<>("SignText", false);
     public final Setting<Boolean> noWeather = new Setting<>("NoWeather", false);
+    public final Setting<Boolean> noArmorStands = new Setting<>("NoArmorStands", false);
 
     private int potionCouter, xpCounter, arrowCounter, itemsCounter;
 
@@ -89,6 +92,9 @@ public class NoRender extends Module {
             if (ent instanceof ItemEntity) {
                 itemsCounter++;
                 if (items.getValue()) mc.world.removeEntity(ent.getId(), Entity.RemovalReason.KILLED);
+            }
+            if (ent instanceof ArmorStandEntity){
+                if(noArmorStands.getValue()) mc.world.removeEntity(ent.getId(), Entity.RemovalReason.KILLED);
             }
         }
 

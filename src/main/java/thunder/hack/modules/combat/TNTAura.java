@@ -15,12 +15,12 @@ import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import thunder.hack.ThunderHack;
-import thunder.hack.events.impl.EventPostSync;
+import thunder.hack.events.impl.EventTick;
 import thunder.hack.modules.Module;
 import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.Timer;
 import thunder.hack.utility.player.InteractionUtility;
 import thunder.hack.utility.player.InventoryUtility;
@@ -45,12 +45,12 @@ public class TNTAura extends Module {
     private final Setting<Integer> blocksPerTick = new Setting<>("Block/Tick", 8, 1, 12);
     private final Setting<Integer> placeDelay = new Setting<>("Delay/Place", 3, 0, 10);
     private final Setting<InteractionUtility.PlaceMode> placeMode = new Setting<>("PlaceMode", InteractionUtility.PlaceMode.Normal);
-    private final Setting<Boolean> rotate = new Setting<>("Rotate", false);
-    private final Setting<Parent> renderCategory = new Setting<>("Render", new Parent(false, 0));
-    private final Setting<RenderMode> renderMode = new Setting<>("RenderMode", RenderMode.Fade).withParent(renderCategory);
-    private final Setting<ColorSetting> renderFillColor = new Setting<>("Fill", new ColorSetting(HudEditor.getColor(0))).withParent(renderCategory);
-    private final Setting<ColorSetting> renderLineColor = new Setting<>("Line", new ColorSetting(HudEditor.getColor(0))).withParent(renderCategory);
-    private final Setting<Integer> renderLineWidth = new Setting<>("LineWidth", 2, 1, 5).withParent(renderCategory);
+    private final Setting<InteractionUtility.Rotate> rotate = new Setting<>("Rotate", InteractionUtility.Rotate.None);
+    private final Setting<SettingGroup> renderCategory = new Setting<>("Render", new SettingGroup(false, 0));
+    private final Setting<RenderMode> renderMode = new Setting<>("RenderMode", RenderMode.Fade).addToGroup(renderCategory);
+    private final Setting<ColorSetting> renderFillColor = new Setting<>("Fill", new ColorSetting(HudEditor.getColor(0))).addToGroup(renderCategory);
+    private final Setting<ColorSetting> renderLineColor = new Setting<>("Line", new ColorSetting(HudEditor.getColor(0))).addToGroup(renderCategory);
+    private final Setting<Integer> renderLineWidth = new Setting<>("LineWidth", 2, 1, 5).addToGroup(renderCategory);
 
     private final Map<BlockPos, Long> renderPoses = new ConcurrentHashMap<>();
     public static Timer inactivityTimer = new Timer();
@@ -80,7 +80,7 @@ public class TNTAura extends Module {
     }
 
     @EventHandler
-    public void onPostSync(EventPostSync e) {
+    public void onTick(EventTick e) {
         if (getTntSlot() == -1) {
             disable(isRu() ? "Нет динамита!" : "No tnt");
             return;
@@ -126,7 +126,7 @@ public class TNTAura extends Module {
             BlockHitResult igniteResult = getIgniteResult(headBlock);
             InventoryUtility.switchTo(getFlintSlot());
             if (mc.world.getBlockState(headBlock).getBlock() instanceof TntBlock && igniteResult != null) {
-                sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, igniteResult, PlayerUtility.getWorldActionId(mc.world)));
+                sendSequencedPacket(id -> new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, igniteResult, id));
                 mc.player.swingHand(Hand.MAIN_HAND);
             }
             renderPoses.put(headBlock, System.currentTimeMillis());

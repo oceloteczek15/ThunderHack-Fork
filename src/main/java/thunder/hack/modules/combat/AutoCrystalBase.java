@@ -21,7 +21,7 @@ import thunder.hack.modules.Module;
 import thunder.hack.modules.client.HudEditor;
 import thunder.hack.gui.notification.Notification;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.BooleanParent;
+import thunder.hack.setting.impl.BooleanSettingGroup;
 import thunder.hack.setting.impl.ColorSetting;
 import thunder.hack.utility.Timer;
 import thunder.hack.utility.math.ExplosionUtility;
@@ -39,6 +39,7 @@ import static thunder.hack.modules.client.ClientSettings.isRu;
 public class AutoCrystalBase extends Module {
     private final Setting<TargetLogic> targetLogic = new Setting<>("TargetLogic", TargetLogic.Distance);
     private final Setting<Integer> range = new Setting<>("Range", 5, 1, 7);
+    private final Setting<Float> minDamageDelta = new Setting<>("MinDamageDelta", 5f, 1f, 20f);
     private final Setting<Integer> placeDelay = new Setting<>("PlaceDelay", 300, 0, 3000);
     private final Setting<Integer> calcDelay = new Setting<>("CalcDelay", 150, 0, 3000);
     private final Setting<InteractionUtility.Interact> interact = new Setting<>("Interact", InteractionUtility.Interact.Strict);
@@ -46,12 +47,12 @@ public class AutoCrystalBase extends Module {
     private final Setting<Boolean> notification = new Setting<>("Notification", true);
     private final Setting<Boolean> disableNoObby = new Setting<>("DisableNoObby", false);
 
-    private final Setting<BooleanParent> render = new Setting<>("Render", new BooleanParent(true));
-    private final Setting<BlockAnimationUtility.BlockRenderMode> renderMode = new Setting<>("RenderMode", BlockAnimationUtility.BlockRenderMode.All).withParent(render);
-    private final Setting<BlockAnimationUtility.BlockAnimationMode> animationMode = new Setting<>("AnimationMode", BlockAnimationUtility.BlockAnimationMode.Fade).withParent(render);
-    private final Setting<ColorSetting> renderFillColor = new Setting<>("RenderFillColor", new ColorSetting(HudEditor.getColor(0))).withParent(render);
-    private final Setting<ColorSetting> renderLineColor = new Setting<>("RenderLineColor", new ColorSetting(HudEditor.getColor(0))).withParent(render);
-    private final Setting<Integer> renderLineWidth = new Setting<>("RenderLineWidth", 2, 1, 5).withParent(render);
+    private final Setting<BooleanSettingGroup> render = new Setting<>("Render", new BooleanSettingGroup(true));
+    private final Setting<BlockAnimationUtility.BlockRenderMode> renderMode = new Setting<>("RenderMode", BlockAnimationUtility.BlockRenderMode.All).addToGroup(render);
+    private final Setting<BlockAnimationUtility.BlockAnimationMode> animationMode = new Setting<>("AnimationMode", BlockAnimationUtility.BlockAnimationMode.Fade).addToGroup(render);
+    private final Setting<ColorSetting> renderFillColor = new Setting<>("RenderFillColor", new ColorSetting(HudEditor.getColor(0))).addToGroup(render);
+    private final Setting<ColorSetting> renderLineColor = new Setting<>("RenderLineColor", new ColorSetting(HudEditor.getColor(0))).addToGroup(render);
+    private final Setting<Integer> renderLineWidth = new Setting<>("RenderLineWidth", 2, 1, 5).addToGroup(render);
 
     private PlayerEntity target;
     private ObbyData bestData;
@@ -82,9 +83,8 @@ public class AutoCrystalBase extends Module {
             return;
         }
 
-        if (calcTimer.every(calcDelay.getValue())) ThunderHack.asyncManager.run(
-                () -> calcPosition(range.getValue(), mc.player.getPos())
-        );
+        if (calcTimer.every(calcDelay.getValue()))
+            ThunderHack.asyncManager.run(() -> calcPosition(range.getValue(), mc.player.getPos()));
     }
 
     @EventHandler
@@ -128,7 +128,7 @@ public class AutoCrystalBase extends Module {
         return ModuleManager.autoCrystal.isEnabled()
                 && bestData != null
                 && ModuleManager.autoCrystal.renderDamage > 2
-                && ModuleManager.autoCrystal.renderDamage < bestData.damage;
+                && (ModuleManager.autoCrystal.renderDamage + minDamageDelta.getValue()) < bestData.damage;
     }
 
     public void calcPosition(float range, Vec3d center) {

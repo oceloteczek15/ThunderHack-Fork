@@ -1,3 +1,4 @@
+
 package thunder.hack.modules.combat;
 
 import meteordevelopment.orbit.EventHandler;
@@ -9,58 +10,57 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BowItem;
 import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
 import net.minecraft.util.Hand;
-import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import thunder.hack.ThunderHack;
 import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.events.impl.EventSync;
+import thunder.hack.events.impl.PlayerUpdateEvent;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
+import thunder.hack.utility.Timer;
 import thunder.hack.utility.math.MathUtility;
 import thunder.hack.utility.math.PredictUtility;
-import thunder.hack.utility.player.PlayerUtility;
 import thunder.hack.utility.render.Render2DEngine;
-import thunder.hack.utility.render.Render3DEngine;
 
-import java.awt.*;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static java.lang.Math.abs;
 import static net.minecraft.util.hit.HitResult.Type.ENTITY;
 import static net.minecraft.util.math.MathHelper.wrapDegrees;
-import static thunder.hack.core.impl.PlayerManager.calcAngleVec;
 
 public final class AimBot extends Module {
     private final Setting<Mode> mode = new Setting<>("Mode", Mode.BowAim);
     private final Setting<Rotation> rotation = new Setting<>("Rotation", Rotation.Silent, v -> mode.getValue() != Mode.AimAssist);
-    public final Setting<Float> aimRange = new Setting<>("Range", 20f, 1f, 30f, v -> mode.getValue() != Mode.AimAssist);
-    public final Setting<Integer> aimStrength = new Setting<>("AimStrength", 30, 1, 100, v -> mode.getValue() == Mode.AimAssist);
-    public final Setting<Boolean> ignoreWalls = new Setting<>("Ignore Walls", true, v -> mode.getValue() == Mode.CSAim);
-    public final Setting<Boolean> ignoreInvisible = new Setting<>("IgnoreInvis", false);
-    public Setting<Float> rotYawRandom = new Setting<>("Yaw Random", 0f, 0f, 3f, v -> mode.getValue() == Mode.CSAim);
-    public Setting<Float> rotPitchRandom = new Setting<>("Pitch Random", 0f, 0f, 3f, v -> mode.getValue() == Mode.CSAim);
-    public Setting<Float> predict = new Setting<>("Aim Predict", 0.5f, 0.5f, 2f, v -> mode.getValue() == Mode.CSAim);
-    public Setting<Integer> delay = new Setting<>("Shoot delay", 5, 0, 10, v -> mode.getValue() == Mode.CSAim);
-    public Setting<Integer> fov = new Setting<>("FOV", 65, 10, 360, v -> mode.getValue() == Mode.CSAim);
-    public Setting<Integer> predictTicks = new Setting<>("PredictTicks", 2, 0, 20, v -> mode.getValue() == Mode.BowAim);
-    private final Setting<Part> part = new Setting<>("Part Mode", Part.Chest, v -> mode.getValue() == Mode.CSAim);
+    private final Setting<Float> aimRange = new Setting<>("Range", 20f, 1f, 30f, v -> mode.getValue() != Mode.AimAssist);
+    private final Setting<Integer> aimStrength = new Setting<>("AimStrength", 30, 1, 100, v -> mode.getValue() == Mode.AimAssist);
+    private final Setting<Integer> aimSmooth = new Setting<>("AimSmooth", 45, 1, 180, v -> mode.getValue() == Mode.AimAssist);
+    private final Setting<Integer> aimtime = new Setting<>("AimTime", 2, 1, 10, v -> mode.getValue() == Mode.AimAssist);
+    private final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", true, v -> mode.getValue() == Mode.CSAim || mode.is(Mode.AimAssist));
+    private final Setting<Boolean> ignoreTeam = new Setting<>("IgnoreTeam", true, v -> mode.getValue() == Mode.CSAim || mode.is(Mode.AimAssist));
+    private final Setting<Integer> reactionTime = new Setting<>("ReactionTime", 80, 1, 500, v -> mode.getValue() == Mode.AimAssist && !ignoreWalls.getValue());
+    private final Setting<Boolean> ignoreInvisible = new Setting<>("IgnoreInvis", false, v -> mode.is(Mode.AimAssist));
+    private final Setting<Float> rotYawRandom = new Setting<>("Yaw Random", 0f, 0f, 3f, v -> mode.getValue() == Mode.CSAim);
+    private final Setting<Float> rotPitchRandom = new Setting<>("PitchRandom", 0f, 0f, 3f, v -> mode.getValue() == Mode.CSAim);
+    private final Setting<Float> predict = new Setting<>("AimPredict", 0.5f, 0.5f, 8f, v -> mode.getValue() == Mode.CSAim);
+    private final Setting<Integer> delay = new Setting<>("Shoot delay", 5, 0, 10, v -> mode.getValue() == Mode.CSAim);
+    private final Setting<Integer> fov = new Setting<>("FOV", 65, 10, 360, v -> mode.getValue() == Mode.CSAim);
+    private final Setting<Integer> predictTicks = new Setting<>("PredictTicks", 2, 0, 20, v -> mode.getValue() == Mode.BowAim);
+    private final Setting<Bone> part = new Setting<>("Bone", Bone.Head, v -> mode.getValue() == Mode.CSAim);
 
-    public static Entity target;
-    public static float ppx, ppy, ppz, pmx, pmy, pmz;
+    private Entity target;
 
-    private float rotationYaw, rotationPitch;
-    private Box debug_box;
-    private float assistAcceleration;
+    private float rotationYaw, rotationPitch, assistAcceleration;
+    private int aimTicks = 0;
+    private Timer visibleTime = new Timer();
 
     public AimBot() {
         super("AimBot", Category.COMBAT);
     }
 
     @EventHandler
-    public void onSync(EventSync event) {
+    public void onPlayerUpdate(PlayerUpdateEvent event) {
         if (mode.getValue() == Mode.BowAim) {
             if (!(mc.player.getActiveItem().getItem() instanceof BowItem)) return;
 
@@ -89,21 +89,63 @@ public final class AimBot extends Module {
             rotationPitch = pitch;
         } else if (mode.getValue() == Mode.CSAim) {
             calcThread();
-            if (target != null && (mc.player.canSee(target) || ignoreWalls.getValue()))
-                if (mc.player.age % delay.getValue() == 0)
-                    sendPacket(new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, PlayerUtility.getWorldActionId(mc.world)));
         } else {
-            if (mc.crosshairTarget.getType() == ENTITY) {
+            if (mc.crosshairTarget.getType() == ENTITY)
+                aimTicks++;
+            else
+                aimTicks = 0;
+
+            if (aimTicks >= aimtime.getValue()) {
                 assistAcceleration = 0;
                 return;
             }
-            rotationYaw = Float.NaN;
+
             PlayerEntity nearestTarget = ThunderHack.combatManager.getNearestTarget(5);
             assistAcceleration += aimStrength.getValue() / 10000f;
 
             if (nearestTarget != null) {
-                rotationYaw = calcAngleVec(ModuleManager.aura.getLegitLook(nearestTarget)).x;
-                return;
+                if (!mc.player.canSee(nearestTarget)) {
+                    if (!ignoreWalls.getValue())
+                        visibleTime.reset();
+                }
+
+                if (!visibleTime.passedMs(reactionTime.getValue())) {
+                    rotationYaw = Float.NaN;
+                    return;
+                }
+
+                if (Float.isNaN(rotationYaw))
+                    rotationYaw = mc.player.getYaw();
+
+                float delta_yaw = wrapDegrees((float) wrapDegrees(Math.toDegrees(Math.atan2(nearestTarget.getEyePos().z - mc.player.getZ(), (nearestTarget.getEyePos().x - mc.player.getX()))) - 90) - rotationYaw);
+                if (delta_yaw > 180)
+                    delta_yaw = delta_yaw - 180;
+                float deltaYaw = MathHelper.clamp(MathHelper.abs(delta_yaw), -aimSmooth.getValue(), aimSmooth.getValue());
+                float newYaw = rotationYaw + (delta_yaw > 0 ? deltaYaw : -deltaYaw);
+                double gcdFix = (Math.pow(mc.options.getMouseSensitivity().getValue() * 0.6 + 0.2, 3.0)) * 1.2;
+                rotationYaw = (float) (newYaw - (newYaw - rotationYaw) % gcdFix);
+            } else rotationYaw = Float.NaN;
+        }
+
+        if (!Float.isNaN(rotationYaw))
+            ModuleManager.rotations.fixRotation = rotationYaw;
+    }
+
+    @EventHandler
+    public void onSync(EventSync event) {
+        if (mode.is(Mode.AimAssist))
+            return;
+
+        if (mode.is(Mode.CSAim)) {
+            if (target != null && (mc.player.canSee(target) || ignoreWalls.getValue())) {
+                if (mc.player.age % delay.getValue() == 0) {
+                    event.addPostAction(() -> {
+                        sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, id));
+                    });
+                }
+            } else {
+                rotationYaw = mc.player.getYaw();
+                rotationPitch = mc.player.getPitch();
             }
         }
 
@@ -112,44 +154,27 @@ public final class AimBot extends Module {
                 mc.player.setYaw(rotationYaw);
                 mc.player.setPitch(rotationPitch);
             }
-        } else {
-            if (mode.getValue() == Mode.CSAim) {
-                rotationYaw = mc.player.getYaw();
-                rotationPitch = mc.player.getPitch();
-            }
         }
     }
 
     @Override
     public void onEnable() {
         target = null;
-        debug_box = null;
-        ppx = ppy = ppz = pmx = pmz = pmy = 0;
         rotationYaw = mc.player.getYaw();
         rotationPitch = mc.player.getPitch();
     }
 
     public void onRender3D(MatrixStack stack) {
-        if (debug_box != null) Render3DEngine.drawFilledBox(stack, debug_box, new Color(0x3400FF41, true));
-
         if (mode.getValue() == Mode.AimAssist) {
             if (Float.isNaN(rotationYaw)) return;
-            double gcdFix = (Math.pow(mc.options.getMouseSensitivity().getValue() * 0.6 + 0.2, 3.0)) * 1.2;
-            rotationYaw = (float) (rotationYaw - (rotationYaw - mc.player.getYaw()) % gcdFix);
-
-            if (abs((mc.player.getYaw() - rotationYaw)) > 170) {
-                mc.player.setYaw(rotationYaw);
-                assistAcceleration = 1;
-                return;
-            }
             mc.player.setYaw((float) Render2DEngine.interpolate(mc.player.getYaw(), rotationYaw, assistAcceleration));
             return;
         }
 
         if (target != null && (mc.player.canSee(target) || ignoreWalls.getValue())) {
             if (rotation.getValue() == Rotation.Client) {
-                mc.player.setYaw(rotationYaw);
-                mc.player.setPitch(rotationPitch);
+                mc.player.setYaw((float) Render2DEngine.interpolate(mc.player.prevYaw, rotationYaw, mc.getTickDelta()));
+                mc.player.setPitch((float) Render2DEngine.interpolate(mc.player.prevPitch, rotationPitch, mc.getTickDelta()));
             }
         } else {
             if (mode.getValue() == Mode.CSAim) {
@@ -163,7 +188,6 @@ public final class AimBot extends Module {
             mc.player.setPitch((float) Render2DEngine.interpolate(mc.player.prevPitch, rotationPitch, mc.getTickDelta()));
         }
     }
-
 
     private float calculateArc(@NotNull PlayerEntity target, double duration) {
         double yArc = target.getY() + (double) (target.getEyeHeight(target.getPose())) - (mc.player.getY() + (double) mc.player.getEyeHeight(mc.player.getPose()));
@@ -193,46 +217,25 @@ public final class AimBot extends Module {
             return;
         }
 
-        Vec3d targetVec = getMatrix4Vec(target);
-        if (targetVec == null) return;
+        Vec3d targetVec = getResolvedPos(target).add(0, part.getValue().getH(), 0);
+
+        if (targetVec == null)
+            return;
 
         float delta_yaw = wrapDegrees((float) wrapDegrees(Math.toDegrees(Math.atan2(targetVec.z - mc.player.getZ(), (targetVec.x - mc.player.getX()))) - 90) - rotationYaw);
         float delta_pitch = ((float) (-Math.toDegrees(Math.atan2(targetVec.y - (mc.player.getPos().y + mc.player.getEyeHeight(mc.player.getPose())), Math.sqrt(Math.pow((targetVec.x - mc.player.getX()), 2) + Math.pow(targetVec.z - mc.player.getZ(), 2))))) - rotationPitch);
 
-        if (delta_yaw > 180) {
+        if (delta_yaw > 180)
             delta_yaw = delta_yaw - 180;
-        }
 
         float deltaYaw = MathHelper.clamp(MathHelper.abs(delta_yaw), MathUtility.random(-40.0F, -60.0F), MathUtility.random(40.0F, 60.0F));
 
         float newYaw = rotationYaw + (delta_yaw > 0 ? deltaYaw : -deltaYaw) + MathUtility.random(-rotYawRandom.getValue(), rotYawRandom.getValue());
         float newPitch = MathHelper.clamp(rotationPitch + MathHelper.clamp(delta_pitch, MathUtility.random(-10.0F, -20.0F), MathUtility.random(10, 20)), -90.0F, 90.0F) + MathUtility.random(-rotPitchRandom.getValue(), rotPitchRandom.getValue());
 
-        double gcdFix1 = mc.options.getMouseSensitivity().getValue() * 0.6 + 0.2;
-        double gcdFix2 = Math.pow(gcdFix1, 3.0) * 8.0;
-        double gcdFix = gcdFix2 * 0.15000000596046448;
-
+        double gcdFix = (Math.pow(mc.options.getMouseSensitivity().getValue() * 0.6 + 0.2, 3.0) * 8.0) * 0.15000000596046448;
         rotationYaw = (float) (newYaw - (newYaw - rotationYaw) % gcdFix);
         rotationPitch = (float) (newPitch - (newPitch - rotationPitch) % gcdFix);
-    }
-
-    public Vec3d getMatrix4Vec(Entity target) {
-        Vec3d cuteTargetPos = getResolvedPos(target);
-        float aimPoint = switch (part.getValue()) {
-            case Head -> 0.05f;
-            case Neck -> 0.3f;
-            case Chest -> 0.5f;
-            case Leggings -> 0.9f;
-            case Boots -> 1.3f;
-        };
-
-        aimPoint = 1.6f - aimPoint;
-
-        Vec3d v1 = new Vec3d(cuteTargetPos.getX(), cuteTargetPos.getY() + aimPoint, cuteTargetPos.getZ());
-        if (mc.player.canSee(target)) {
-            return v1;
-        }
-        return null;
     }
 
     public void findTarget() {
@@ -242,14 +245,14 @@ public final class AimBot extends Module {
             first_stage.add(entity);
         }
 
-        float best_distance = 144;
+        float best_fov = fov.getValue();
         Entity best_entity = null;
 
         for (Entity ent : first_stage) {
-            float temp_dst = (float) Math.sqrt(mc.player.squaredDistanceTo(getResolvedPos(ent)));
-            if (temp_dst < best_distance) {
+            float temp_fov = Math.abs(((float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(ent.getZ() - mc.player.getZ(), ent.getX() - mc.player.getX())) - 90.0)) - MathHelper.wrapDegrees(mc.player.getYaw()));
+            if (temp_fov < best_fov) {
                 best_entity = ent;
-                best_distance = temp_dst;
+                best_fov = temp_fov;
             }
         }
         target = best_entity;
@@ -261,11 +264,13 @@ public final class AimBot extends Module {
         if (!entity.isAlive()) return true;
         if (entity instanceof ArmorStandEntity) return true;
         if (ModuleManager.antiBot.isEnabled() && AntiBot.bots.contains(entity)) return true;
-        if (!(entity instanceof PlayerEntity)) return true;
+        if (!(entity instanceof PlayerEntity pl)) return true;
         if (entity == mc.player) return true;
         if (entity.isInvisible() && ignoreInvisible.getValue()) return true;
-        if (ThunderHack.friendManager.isFriend((PlayerEntity) entity)) return true;
+        if (ThunderHack.friendManager.isFriend(pl)) return true;
         if (Math.abs(getYawToEntityNew(entity)) > fov.getValue()) return true;
+        if (pl.getTeamColorValue() == mc.player.getTeamColorValue() && ignoreTeam.getValue() && mc.player.getTeamColorValue() != 16777215)
+            return true;
         return mc.player.squaredDistanceTo(getResolvedPos(entity)) > aimRange.getPow2Value();
     }
 
@@ -277,16 +282,29 @@ public final class AimBot extends Module {
         double xDist = destX - srcX;
         double zDist = destZ - srcZ;
         float yaw1 = (float) (StrictMath.atan2(zDist, xDist) * 180.0 / 3.141592653589793) - 90.0f;
-        return yaw + MathHelper.wrapDegrees(yaw1 - yaw);
+        return yaw + wrapDegrees(yaw1 - yaw);
     }
 
     private Vec3d getResolvedPos(@NotNull Entity pl) {
-        return new Vec3d(pl.getX() + pl.getVelocity().x * predict.getValue(), pl.getY(), pl.getZ() + pl.getVelocity().z * predict.getValue());
+        return new Vec3d(pl.getX() + (pl.getX() - pl.prevX) * predict.getValue(), pl.getY(), pl.getZ() + (pl.getZ() - pl.prevZ) * predict.getValue());
     }
 
+    private enum Bone {
+        Head(1.7f),
+        Neck(1.5f),
+        Torso(1.f),
+        Tights(0.8f),
+        Feet(0.25f);
 
-    private enum Part {
-        Chest, Head, Neck, Leggings, Boots
+        private final float h;
+
+        Bone(float h) {
+            this.h = h;
+        }
+
+        public float getH() {
+            return h;
+        }
     }
 
     private enum Rotation {

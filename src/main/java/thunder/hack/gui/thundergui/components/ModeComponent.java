@@ -3,6 +3,7 @@ package thunder.hack.gui.thundergui.components;
 import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.gui.thundergui.ThunderGui;
 import thunder.hack.modules.client.ClickGui;
+import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
 import thunder.hack.utility.render.Render2DEngine;
 import net.minecraft.client.util.math.MatrixStack;
@@ -25,7 +26,7 @@ public class ModeComponent extends SettingElement {
         if ((getY() > ThunderGui.getInstance().main_posY + ThunderGui.getInstance().height) || getY() < ThunderGui.getInstance().main_posY) {
             return;
         }
-        FontRenderers.modules.drawString(stack,getSetting().getName(), (float) getX(), (float) getY() + 5, isHovered() ? -1 : new Color(0xB0FFFFFF, true).getRGB(), false);
+        FontRenderers.modules.drawString(stack,getSetting().getName(), (float) getX(), (float) getY() + 5, isHovered() ? -1 : new Color(0xB0FFFFFF, true).getRGB());
 
 
         if (open) {
@@ -42,7 +43,7 @@ public class ModeComponent extends SettingElement {
             Render2DEngine.drawRound(stack,(float) (x + 114), (float) (y + 2), 62, 11, 0.5f, new Color(50, 35, 60, 178));
         }
 
-        FontRenderers.modules.drawString(stack,setting.currentEnumName(), (float) (x + 116), (float) (y + 6), new Color(0xB0FFFFFF, true).getRGB(), false);
+        FontRenderers.modules.drawString(stack,setting.currentEnumName(), (float) (x + 116), (float) (y + 6), new Color(0xB0FFFFFF, true).getRGB());
 
         String arrow = "n";
         switch (progress) {
@@ -66,7 +67,7 @@ public class ModeComponent extends SettingElement {
 
         double offsetY = 13;
         if (open) {
-            Color color = ClickGui.getInstance().getColor(0);
+            Color color = HudEditor.getColor(1);
             for (int i = 0; i <= setting.getModes().length - 1; i++) {
                 FontRenderers.settings.drawString(stack,setting.getModes()[i], (float) (x + 116), (float) ((y + 5) + offsetY), setting.currentEnumName().equalsIgnoreCase(setting.getModes()[i]) ? color.getRGB() : -1);
                 offsetY += 12;

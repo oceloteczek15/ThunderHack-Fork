@@ -46,7 +46,7 @@ public class Blink extends Module {
     }
 
     private PlayerEntityCopy blinkPlayer;
-    private Vec3d lastPos = Vec3d.ZERO;
+    public static Vec3d lastPos = Vec3d.ZERO;
     private Vec3d prevVelocity = Vec3d.ZERO;
     private float prevYaw = 0;
     private boolean prevSprinting = false;
@@ -81,7 +81,9 @@ public class Blink extends Module {
     @Override
     public void onDisable() {
         if (mc.world == null || mc.player == null) return;
-        while (!storedPackets.isEmpty()) sendPacket(storedPackets.poll());
+
+        while (!storedPackets.isEmpty())
+            sendPacket(storedPackets.poll());
 
         if (blinkPlayer != null) blinkPlayer.deSpawn();
         blinkPlayer = null;
@@ -196,7 +198,7 @@ public class Blink extends Module {
                 }
 
                 for (int j = 0; j < vecs.size() - 1; ++j) {
-                    Render3DEngine.drawLine(vecs.get(j).x, vecs.get(j).y, vecs.get(j).z, vecs.get(j + 1).x, vecs.get(j + 1).y, vecs.get(j + 1).z, new Color(rgb), 2f);
+                    Render3DEngine.drawLine(vecs.get(j), vecs.get(j + 1), new Color(rgb));
                     hue += (1F / 360F);
                     rgb = Color.getHSBColor(hue, hsb[1], hsb[2]).getRGB();
                 }

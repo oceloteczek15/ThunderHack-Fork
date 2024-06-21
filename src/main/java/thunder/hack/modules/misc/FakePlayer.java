@@ -41,15 +41,15 @@ public class FakePlayer extends Module {
     private Setting<Boolean> record = new Setting<>("Record", false);
     private Setting<Boolean> play = new Setting<>("Play", false);
     private Setting<Boolean> autoTotem = new Setting<>("AutoTotem", false);
+    private Setting<String> name = new Setting<>("Name", "Hell_Raider");
 
     private final List<PlayerState> positions = new ArrayList<>();
 
     int movementTick, deathTime;
 
-
     @Override
     public void onEnable() {
-        fakePlayer = new OtherClientPlayerEntity(mc.world, new GameProfile(UUID.fromString("66123666-6666-6666-6666-666666666600"), "Hell_Raider"));
+        fakePlayer = new OtherClientPlayerEntity(mc.world, new GameProfile(UUID.fromString("66123666-6666-6666-6666-666666666600"), name.getValue()));
         fakePlayer.copyPositionAndRotation(mc.player);
 
         if (copyInventory.getValue()) {
@@ -72,11 +72,11 @@ public class FakePlayer extends Module {
     public void onPacketReceive(PacketEvent.Receive e) {
         if (e.getPacket() instanceof ExplosionS2CPacket explosion && fakePlayer != null && fakePlayer.hurtTime == 0) {
             fakePlayer.onDamaged(mc.world.getDamageSources().generic());
-            fakePlayer.setHealth(fakePlayer.getHealth() + fakePlayer.getAbsorptionAmount() - ExplosionUtility.getAutoCrystalDamage(new Vec3d(explosion.getX(), explosion.getY(), explosion.getZ()), fakePlayer));
+            fakePlayer.setHealth(fakePlayer.getHealth() + fakePlayer.getAbsorptionAmount() - ExplosionUtility.getAutoCrystalDamage(new Vec3d(explosion.getX(), explosion.getY(), explosion.getZ()), fakePlayer, 0, false));
             if (fakePlayer.isDead()) {
                 if (fakePlayer.tryUseTotem(mc.world.getDamageSources().generic())) {
                     fakePlayer.setHealth(10f);
-                    new EntityStatusS2CPacket(fakePlayer, EntityStatuses.USE_TOTEM_OF_UNDYING).apply(mc.player.networkHandler);
+              //      new EntityStatusS2CPacket(fakePlayer, EntityStatuses.USE_TOTEM_OF_UNDYING).apply(mc.player.networkHandler);
                 }
             }
         }
@@ -117,7 +117,7 @@ public class FakePlayer extends Module {
 
     @EventHandler
     public void onAttack(EventAttack e) {
-        if (fakePlayer != null && e.getEntity() == fakePlayer && fakePlayer.hurtTime == 0) {
+        if (fakePlayer != null && e.getEntity() == fakePlayer && fakePlayer.hurtTime == 0 && !e.isPre()) {
             mc.world.playSound(mc.player, fakePlayer.getX(), fakePlayer.getY(), fakePlayer.getZ(), SoundEvents.ENTITY_PLAYER_HURT, SoundCategory.PLAYERS, 1f, 1f);
 
             if (mc.player.fallDistance > 0 || ModuleManager.criticals.isEnabled())

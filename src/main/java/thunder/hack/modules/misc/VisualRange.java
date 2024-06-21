@@ -7,6 +7,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Formatting;
 import thunder.hack.ThunderHack;
+import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.events.impl.EventEntityRemoved;
 import thunder.hack.events.impl.EventEntitySpawn;
 import thunder.hack.modules.Module;
@@ -51,18 +52,23 @@ public class VisualRange extends Module {
 
     public void notify(Entity entity, boolean enter) {
         String message = "";
+        if(ModuleManager.nameProtect.isEnabled() && NameProtect.hideFriends.getValue()){
+            message = Formatting.AQUA + NameProtect.newName.getValue();
+        }
         if (ThunderHack.friendManager.isFriend(entity.getName().getString()))
             message = Formatting.AQUA + entity.getName().getString();
         else message = Formatting.GRAY + entity.getName().getString();
 
+
         if (enter) message += Formatting.GREEN + " was found!";
         else message += Formatting.RED + " left to X:" + (int)entity.getX() + " Z:" + (int) entity.getZ();
 
-        if (mode.getValue() == Mode.Chat)
+        if (mode.is(Mode.Chat) || mode.is(Mode.Both))
             sendMessage(message);
 
-        if (mode.getValue() == Mode.Notification)
+        if (mode.is(Mode.Notification) || mode.is(Mode.Both))
             ThunderHack.notificationManager.publicity("VisualRange", message, 2, Notification.Type.WARNING);
+
 
         if (soundpl.getValue()) {
             try {
@@ -81,6 +87,6 @@ public class VisualRange extends Module {
     }
 
     public enum Mode {
-        Chat, Notification
+        Chat, Notification, Both
     }
 }

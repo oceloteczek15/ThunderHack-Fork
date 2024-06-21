@@ -5,7 +5,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import thunder.hack.ThunderHack;
 import thunder.hack.gui.clickui.AbstractElement;
 import thunder.hack.gui.font.FontRenderers;
-import thunder.hack.modules.client.ClickGui;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
 import thunder.hack.utility.math.MathUtility;
@@ -27,16 +26,16 @@ public class ColorPickerElement extends AbstractElement {
 
     private Color prevColor;
 
-    private boolean firstInit;
+    private boolean firstInit, extended;
 
-    private Setting colorSetting;
+    private final Setting colorSetting;
 
     public ColorSetting getColorSetting() {
         return (ColorSetting) colorSetting.getValue();
     }
 
-    public ColorPickerElement(Setting setting, boolean small) {
-        super(setting, small);
+    public ColorPickerElement(Setting setting) {
+        super(setting);
         this.colorSetting = setting;
         prevColor = getColorSetting().getColorObject();
         updatePos();
@@ -48,28 +47,40 @@ public class ColorPickerElement extends AbstractElement {
 
         MatrixStack matrixStack = context.getMatrices();
 
-        Render2DEngine.drawRound(matrixStack, (float) x + 5, (float) y + 2, (float) width - 10, (float) height - 4, 4, new Color(bgcolor));
-        FontRenderers.getSettingsRenderer().drawString(matrixStack, setting.getName(), x + 8, (int) y + 8, ClickGui.getInstance().getTextColor(setting.getModule()));
+        boolean colorHovered = Render2DEngine.isHovered(mouseX, mouseY, x, y + 5f, 90, 7);
 
-        Render2DEngine.drawBlurredShadow(matrixStack, (float) (x + width - 25f), (float) (y + 5f), 14, 7, 10, getColorSetting().getColorObject());
-        Render2DEngine.drawRound(matrixStack, (float) (x + width - 25), (float) (y + 5), 14, 7, 1, getColorSetting().getColorObject());
+        FontRenderers.sf_medium_mini.drawString(matrixStack, setting.getName(), x + 6, y + 8, new Color(-1).getRGB());
 
-        boolean rainbowHovered = Render2DEngine.isHovered(mouseX, mouseY, (float) (x + width - 65), (float) (y + 5), 33, 7);
-        boolean copyHovered = Render2DEngine.isHovered(mouseX, mouseY, (float) (x + width - 95), (float) (y + 54), 40, 7);
-        boolean pasteHovered = Render2DEngine.isHovered(mouseX, mouseY, (float) (x + width - 49), (float) (y + 54), 40, 7);
+        Render2DEngine.drawBlurredShadow(matrixStack, x + width - 22f, y + 5f, 14, 7, colorHovered ? 6 : 10, getColorSetting().getColorObject());
+        if (colorHovered)
+            Render2DEngine.drawRound(matrixStack, x + width - 22.5f, y + 4.5f, 15, 8, 1, getColorSetting().getColorObject());
+        else
+            Render2DEngine.drawRound(matrixStack, x + width - 22, y + 5, 14, 7, 1, getColorSetting().getColorObject());
+
+        if (!extended)
+            return;
+
+        boolean rainbowHovered = Render2DEngine.isHovered(mouseX, mouseY, x + 36f, y + 54f, 24, 7);
+        boolean copyHovered = Render2DEngine.isHovered(mouseX, mouseY, x + 9f, y + 54f, 24, 7);
+        boolean pasteHovered = Render2DEngine.isHovered(mouseX, mouseY, x + 63f, y + 54f, 24, 7);
         boolean dark = Render2DEngine.isDark(ThunderHack.copy_color);
         boolean dark2 = Render2DEngine.isDark(getColorSetting().getColorObject());
 
-        Render2DEngine.drawRound(matrixStack, (float) (x + width - 65f), (float) (y + 5f), 33, 7, 1, getColorSetting().isRainbow() ? getColorSetting().getColorObject() : new Color(0x424242));
-        FontRenderers.getSettingsRenderer().drawString(matrixStack, "Rainbow", (x + width - 62), (y + 8), rainbowHovered ? new Color(0xA3FFFFFF, true).getRGB() : (dark2 ? Color.WHITE.getRGB() : Color.BLACK.getRGB()));
+        Render2DEngine.drawRect(matrixStack, x + 9f, y + 54f, 24, 7, new Color(0x424242));
+        FontRenderers.sf_medium_mini.drawString(matrixStack, "Сopy", x + 13, y + 56.5f, copyHovered ? new Color(0xA3FFFFFF, true).getRGB() : Color.WHITE.getRGB());
 
-        Render2DEngine.drawRound(matrixStack, (float) (x + 9f), (float) (y + 54f), 40, 7, 1, new Color(0x424242));
-        FontRenderers.getSettingsRenderer().drawString(matrixStack, "Сopy", (x + 19), (y + 57), copyHovered ? new Color(0xA3FFFFFF, true).getRGB() : Color.WHITE.getRGB());
+        Render2DEngine.drawRect(matrixStack, x + 36f, y + 54f, 24, 7, getColorSetting().isRainbow() ? getColorSetting().getColorObject() : new Color(0x424242));
+        FontRenderers.sf_medium_mini.drawString(matrixStack, "RB", x + 44f, y + 56.5f, rainbowHovered ? new Color(0xA3FFFFFF, true).getRGB() : (dark2 ? Color.WHITE.getRGB() : Color.BLACK.getRGB()));
 
-        Render2DEngine.drawRound(matrixStack, (float) (x + width - 49f), (float) (y + 54f), 40, 7, 1, ThunderHack.copy_color);
-        FontRenderers.getSettingsRenderer().drawString(matrixStack, "Paste", (x + width - 37), (y + 57), pasteHovered ? new Color(0xA3FFFFFF, true).getRGB() : dark ? Color.WHITE.getRGB() : Color.BLACK.getRGB());
+        Render2DEngine.drawRect(matrixStack, x + 63f, y + 54f, 24, 7, ThunderHack.copy_color);
+        FontRenderers.sf_medium_mini.drawString(matrixStack, "Paste", x + 67f, y + 56.5f, pasteHovered ? new Color(0xA3FFFFFF, true).getRGB() : dark ? Color.WHITE.getRGB() : Color.BLACK.getRGB());
 
         renderPicker(matrixStack, mouseX, mouseY, getColorSetting().getColorObject());
+    }
+
+    @Override
+    public float getHeight() {
+        return extended ? 66 : 15;
     }
 
     private void renderPicker(MatrixStack matrixStack, int mouseX, int mouseY, Color color) {
@@ -156,9 +167,16 @@ public class ColorPickerElement extends AbstractElement {
         double cw = width - 34;
         double ch = height - 30;
 
-        boolean copyHovered = Render2DEngine.isHovered(mouseX, mouseY, (float) (x + width - 95), (float) (y + 54), 40, 7);
-        boolean pasteHovered = Render2DEngine.isHovered(mouseX, mouseY, (float) (x + width - 49), (float) (y + 54), 40, 7);
-        boolean rainbowHovered = Render2DEngine.isHovered(mouseX, mouseY, (float) (x + width - 65), (float) (y + 5), 33, 7);
+        boolean rainbowHovered = Render2DEngine.isHovered(mouseX, mouseY, x + 36f, y + 54f, 24, 7);
+        boolean copyHovered = Render2DEngine.isHovered(mouseX, mouseY, x + 9f, y + 54f, 24, 7);
+        boolean pasteHovered = Render2DEngine.isHovered(mouseX, mouseY, x + 63f, y + 54f, 24, 7);
+        boolean colorHovered = Render2DEngine.isHovered(mouseX, mouseY, x, y, 90, 11);
+
+        if (colorHovered)
+            extended = !extended;
+
+        if (!extended)
+            return;
 
         if (Render2DEngine.isHovered(mouseX, mouseY, cx + cw + 17, cy, 8, ch) && button == 0) afocused = true;
 

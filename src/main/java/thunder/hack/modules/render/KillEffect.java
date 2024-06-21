@@ -10,10 +10,10 @@ import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundCategory;
 import thunder.hack.ThunderHack;
+import thunder.hack.core.impl.SoundManager;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
-import thunder.hack.utility.SoundUtility;
 import thunder.hack.utility.render.Render3DEngine;
 
 import java.awt.*;
@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class KillEffect extends Module {
     private final Setting<Mode> mode = new Setting<>("Mode", Mode.Orthodox);
     private final Setting<Integer> speed = new Setting<>("Y Speed", 0, -10, 10, value -> mode.getValue() == Mode.Orthodox);
+    public final Setting<Integer> volume = new Setting<>("Volume", 100, 0, 100);
     private final Setting<Boolean> playSound = new Setting<>("Play Sound", true, value -> mode.getValue() == Mode.Orthodox);
     private final Setting<ColorSetting> color = new Setting<>("Color", new ColorSetting(new Color(255, 255, 0, 150)), value -> mode.getValue() == Mode.Orthodox);
     private final Setting<Boolean> mobs = new Setting<>("Mobs", false);
@@ -49,9 +50,9 @@ public class KillEffect extends Module {
                 if (System.currentTimeMillis() - time > 3000) {
                     renderEntities.remove(entity);
                 } else {
-                    Render3DEngine.drawLine(entity.getPos().add(0, calculateSpeed(), 0), entity.getPos().add(0, 3 + calculateSpeed(), 0), color.getValue().getColorObject(), 5);
-                    Render3DEngine.drawLine(entity.getPos().add(1, 2.3 + calculateSpeed(), 0), entity.getPos().add(-1, 2.3 + calculateSpeed(), 0), color.getValue().getColorObject(), 5);
-                    Render3DEngine.drawLine(entity.getPos().add(0.5, 1.2 + calculateSpeed(), 0), entity.getPos().add(-0.5, 0.8 + calculateSpeed(), 0), color.getValue().getColorObject(), 5);
+                    Render3DEngine.drawLine(entity.getPos().add(0, calculateSpeed(), 0), entity.getPos().add(0, 3 + calculateSpeed(), 0), color.getValue().getColorObject());
+                    Render3DEngine.drawLine(entity.getPos().add(1, 2.3 + calculateSpeed(), 0), entity.getPos().add(-1, 2.3 + calculateSpeed(), 0), color.getValue().getColorObject());
+                    Render3DEngine.drawLine(entity.getPos().add(0.5, 1.2 + calculateSpeed(), 0), entity.getPos().add(-0.5, 0.8 + calculateSpeed(), 0), color.getValue().getColorObject());
                 }
             });
             case FallingLava -> renderEntities.keySet().forEach(entity -> {
@@ -86,7 +87,8 @@ public class KillEffect extends Module {
             if (entity.isAlive() || liv.getHealth() != 0) return;
 
             if (playSound.getValue() && mode.getValue() == Mode.Orthodox)
-                mc.world.playSound(mc.player, entity.getBlockPos(), SoundUtility.ORTHODOX_SOUNDEVENT, SoundCategory.BLOCKS, 10f, 1f);
+                mc.world.playSound(mc.player, entity.getBlockPos(), ThunderHack.soundManager.ORTHODOX_SOUNDEVENT, SoundCategory.BLOCKS, volume.getValue() / 100f, 1f);
+
             renderEntities.put(entity, System.currentTimeMillis());
         });
 

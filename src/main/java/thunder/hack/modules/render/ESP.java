@@ -16,20 +16,21 @@ import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.thrown.EnderPearlEntity;
 import net.minecraft.item.Items;
+import net.minecraft.particle.EntityEffectParticleEffect;
+import net.minecraft.particle.ParticleEffect;
 import net.minecraft.util.math.*;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.joml.Vector4d;
 import thunder.hack.ThunderHack;
 import thunder.hack.gui.font.FontRenderers;
-import thunder.hack.gui.hud.impl.RadarRewrite;
+import thunder.hack.injection.accesors.IAreaEffectCloudEntity;
 import thunder.hack.injection.accesors.IBeaconBlockEntity;
 import thunder.hack.modules.Module;
-import thunder.hack.modules.client.ClickGui;
 import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.render.Render2DEngine;
 import thunder.hack.utility.render.Render3DEngine;
 
@@ -60,33 +61,34 @@ public class ESP extends Module {
     private final Setting<ColorSetting> dizorentColor = new Setting<>("DizorentColor", new ColorSetting(new Color(0xB300F1CC, true)), v -> dizorentRadius.getValue());
 
 
-    private final Setting<Parent> boxEsp = new Setting<>("Box", new Parent(false, 0));
-    private final Setting<Boolean> players = new Setting<>("Players", true).withParent(boxEsp);
-    private final Setting<Boolean> friends = new Setting<>("Friends", true).withParent(boxEsp);
-    private final Setting<Boolean> crystals = new Setting<>("Crystals", true).withParent(boxEsp);
-    private final Setting<Boolean> creatures = new Setting<>("Creatures", false).withParent(boxEsp);
-    private final Setting<Boolean> monsters = new Setting<>("Monsters", false).withParent(boxEsp);
-    private final Setting<Boolean> ambients = new Setting<>("Ambients", false).withParent(boxEsp);
-    private final Setting<Boolean> others = new Setting<>("Others", false).withParent(boxEsp);
-    private final Setting<Boolean> outline = new Setting<>("Outline", true).withParent(boxEsp);
-    private final Setting<Colors> colorMode = new Setting<>("ColorMode", Colors.SyncColor).withParent(boxEsp);
-    private final Setting<Boolean> renderHealth = new Setting<>("renderHealth", true).withParent(boxEsp);
+    private final Setting<SettingGroup> boxEsp = new Setting<>("Box", new SettingGroup(false, 0));
+    private final Setting<Boolean> players = new Setting<>("Players", true).addToGroup(boxEsp);
+    private final Setting<Boolean> friends = new Setting<>("Friends", true).addToGroup(boxEsp);
+    private final Setting<Boolean> crystals = new Setting<>("Crystals", true).addToGroup(boxEsp);
+    private final Setting<Boolean> creatures = new Setting<>("Creatures", false).addToGroup(boxEsp);
+    private final Setting<Boolean> monsters = new Setting<>("Monsters", false).addToGroup(boxEsp);
+    private final Setting<Boolean> ambients = new Setting<>("Ambients", false).addToGroup(boxEsp);
+    private final Setting<Boolean> others = new Setting<>("Others", false).addToGroup(boxEsp);
+    private final Setting<Boolean> outline = new Setting<>("Outline", true).addToGroup(boxEsp);
+    private final Setting<Colors> colorMode = new Setting<>("ColorMode", Colors.SyncColor).addToGroup(boxEsp);
+    private final Setting<Boolean> renderHealth = new Setting<>("renderHealth", true).addToGroup(boxEsp);
 
 
-    private final Setting<Parent> boxColors = new Setting<>("BoxColors", new Parent(false, 0));
-    private final Setting<ColorSetting> playersC = new Setting<>("PlayersC", new ColorSetting(new Color(0xFF9200))).withParent(boxColors);
-    private final Setting<ColorSetting> friendsC = new Setting<>("FriendsC", new ColorSetting(new Color(0x30FF00))).withParent(boxColors);
-    private final Setting<ColorSetting> crystalsC = new Setting<>("CrystalsC", new ColorSetting(new Color(0x00BBFF))).withParent(boxColors);
-    private final Setting<ColorSetting> creaturesC = new Setting<>("CreaturesC", new ColorSetting(new Color(0xA0A4A6))).withParent(boxColors);
-    private final Setting<ColorSetting> monstersC = new Setting<>("MonstersC", new ColorSetting(new Color(0xFF0000))).withParent(boxColors);
-    private final Setting<ColorSetting> ambientsC = new Setting<>("AmbientsC", new ColorSetting(new Color(0x7B00FF))).withParent(boxColors);
-    private final Setting<ColorSetting> othersC = new Setting<>("OthersC", new ColorSetting(new Color(0xFF0062))).withParent(boxColors);
-    public final Setting<ColorSetting> healthB = new Setting<>("healthB", new ColorSetting(new Color(0xff1100))).withParent(boxColors);
-    public final Setting<ColorSetting> healthU = new Setting<>("healthU", new ColorSetting(new Color(0x2fff00))).withParent(boxColors);
+    private final Setting<SettingGroup> boxColors = new Setting<>("BoxColors", new SettingGroup(false, 0));
+    private final Setting<ColorSetting> playersC = new Setting<>("PlayersC", new ColorSetting(new Color(0xFF9200))).addToGroup(boxColors);
+    private final Setting<ColorSetting> friendsC = new Setting<>("FriendsC", new ColorSetting(new Color(0x30FF00))).addToGroup(boxColors);
+    private final Setting<ColorSetting> crystalsC = new Setting<>("CrystalsC", new ColorSetting(new Color(0x00BBFF))).addToGroup(boxColors);
+    private final Setting<ColorSetting> creaturesC = new Setting<>("CreaturesC", new ColorSetting(new Color(0xA0A4A6))).addToGroup(boxColors);
+    private final Setting<ColorSetting> monstersC = new Setting<>("MonstersC", new ColorSetting(new Color(0xFF0000))).addToGroup(boxColors);
+    private final Setting<ColorSetting> ambientsC = new Setting<>("AmbientsC", new ColorSetting(new Color(0x7B00FF))).addToGroup(boxColors);
+    private final Setting<ColorSetting> othersC = new Setting<>("OthersC", new ColorSetting(new Color(0xFF0062))).addToGroup(boxColors);
+    public final Setting<ColorSetting> healthB = new Setting<>("healthB", new ColorSetting(new Color(0xff1100))).addToGroup(boxColors);
+    public final Setting<ColorSetting> healthU = new Setting<>("healthU", new ColorSetting(new Color(0x2fff00))).addToGroup(boxColors);
 
     private float dizorentAnimation = 0f;
 
     public void onRender3D(MatrixStack stack) {
+        if(mc.options.hudHidden) return;
         if (lingeringPotions.getValue()) {
             for (Entity ent : mc.world.getEntities()) {
                 if (ent instanceof AreaEffectCloudEntity aece) {
@@ -101,15 +103,15 @@ public class ESP extends Module {
 
                     Tessellator tessellator = Tessellator.getInstance();
                     BufferBuilder bufferBuilder = tessellator.getBuffer();
-                    Render3DEngine.setup();
+                    Render3DEngine.setupRender();
                     RenderSystem.disableDepthTest();
                     RenderSystem.setShader(GameRenderer::getPositionColorProgram);
                     bufferBuilder.begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
                     for (int i = 0; i <= 360; i += 6) {
                         double v = Math.sin(Math.toRadians(i));
                         double u = Math.cos(Math.toRadians(i));
-                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), (float) u * middle, (float) 0, (float) v * middle).color(Render2DEngine.injectAlpha(new Color(aece.getColor()), 100).getRGB()).next();
-                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), 0, 0, 0).color(Render2DEngine.injectAlpha(new Color(aece.getColor()), 0).getRGB()).next();
+                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), (float) u * middle, (float) 0, (float) v * middle).color(Render2DEngine.injectAlpha(new Color(getAreaCloudColor(aece)), 100).getRGB()).next();
+                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), 0, 0, 0).color(Render2DEngine.injectAlpha(new Color(getAreaCloudColor(aece)), 0).getRGB()).next();
                     }
                     tessellator.draw();
 
@@ -118,12 +120,12 @@ public class ESP extends Module {
                     for (int i = 0; i <= 360; i += 6) {
                         double v = Math.sin(Math.toRadians(i));
                         double u = Math.cos(Math.toRadians(i));
-                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), (float) u * middle, (float) 0, (float) v * middle).color(Render2DEngine.injectAlpha(new Color(aece.getColor()), 255).getRGB()).next();
-                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), (float) u * (middle - 0.04f), (float) 0, (float) v * (middle - 0.04f)).color(Render2DEngine.injectAlpha(new Color(aece.getColor()), 255).getRGB()).next();
+                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), (float) u * middle, (float) 0, (float) v * middle).color(Render2DEngine.injectAlpha(new Color(getAreaCloudColor(aece)), 255).getRGB()).next();
+                        bufferBuilder.vertex(stack.peek().getPositionMatrix(), (float) u * (middle - 0.04f), (float) 0, (float) v * (middle - 0.04f)).color(Render2DEngine.injectAlpha(new Color(getAreaCloudColor(aece)), 255).getRGB()).next();
                     }
                     tessellator.draw();
 
-                    Render3DEngine.cleanup();
+                    Render3DEngine.endRender();
                     RenderSystem.enableDepthTest();
                     stack.translate(-x, -y, -z);
                     stack.pop();
@@ -163,7 +165,7 @@ public class ESP extends Module {
 
                 Tessellator tessellator = Tessellator.getInstance();
                 BufferBuilder bufferBuilder = tessellator.getBuffer();
-                Render3DEngine.setup();
+                Render3DEngine.setupRender();
                 RenderSystem.disableDepthTest();
                 RenderSystem.setShader(GameRenderer::getPositionColorProgram);
                 bufferBuilder.begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
@@ -185,7 +187,7 @@ public class ESP extends Module {
                 }
                 tessellator.draw();
 
-                Render3DEngine.cleanup();
+                Render3DEngine.endRender();
                 RenderSystem.enableDepthTest();
                 stack.translate(-x, -y, -z);
                 stack.pop();
@@ -295,6 +297,7 @@ public class ESP extends Module {
     }
 
     public void onRender2D(DrawContext context) {
+        if(mc.options.hudHidden) return;
         if (pearls.getValue()) {
             for (Entity ent : mc.world.getEntities()) {
                 if (ent instanceof EnderPearlEntity pearl) {
@@ -437,6 +440,14 @@ public class ESP extends Module {
                     case SyncColor ->  Render2DEngine.setRectPoints(bufferBuilder, matrix, (float) (posX - 5), (float) (endPosY + (posY - endPosY) * lent.getHealth() / lent.getMaxHealth()), (float) posX - 3, (float) endPosY, HudEditor.getColor(90), HudEditor.getColor(90), HudEditor.getColor(270), HudEditor.getColor(270));
                 }
             } }
+    }
+
+    private int getAreaCloudColor(AreaEffectCloudEntity ent) {
+        ParticleEffect particleEffect = ent.getParticleType();
+        if (particleEffect instanceof EntityEffectParticleEffect effect) {
+            return ((IAreaEffectCloudEntity)ent).getPotionContentsComponent().getColor();
+        }
+        return -1;
     }
 
     public static float getRotations(Vec2f vec) {

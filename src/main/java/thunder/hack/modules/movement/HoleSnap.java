@@ -14,7 +14,7 @@ import thunder.hack.events.impl.EventPlayerJump;
 import thunder.hack.events.impl.EventPlayerTravel;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.player.InteractionUtility;
 import thunder.hack.utility.world.HoleUtility;
 
@@ -25,13 +25,14 @@ import static thunder.hack.modules.client.ClientSettings.isRu;
 public class HoleSnap extends Module {
     private final Setting<Mode> mode = new Setting<>("Mode", Mode.Yaw);
     private final Setting<Integer> searchRange = new Setting<>("Search Range", 5, 1, 20);
+    private final Setting<Integer> searchFOV = new Setting<>("Search FOV", 360, 1, 360);
     private final Setting<Boolean> useTimer = new Setting<>("Use Timer", false);
     private final Setting<Float> timerValue = new Setting<>("Timer Value", 1f, 0f, 20f);
 
-    private final Setting<Parent> autoDisable = new Setting<>("Auto Disable", new Parent(false, 0));
-    private final Setting<Boolean> onDeath = new Setting<>("On Death", true).withParent(autoDisable);
-    private final Setting<Boolean> onInHole = new Setting<>("In Hole", true).withParent(autoDisable);
-    private final Setting<Boolean> onNoHoleFound = new Setting<>("No Holes", false).withParent(autoDisable);
+    private final Setting<SettingGroup> autoDisable = new Setting<>("Auto Disable", new SettingGroup(false, 0));
+    private final Setting<Boolean> onDeath = new Setting<>("On Death", true).addToGroup(autoDisable);
+    private final Setting<Boolean> onInHole = new Setting<>("In Hole", true).addToGroup(autoDisable);
+    private final Setting<Boolean> onNoHoleFound = new Setting<>("No Holes", false).addToGroup(autoDisable);
 
     private BlockPos hole;
     private float prevClientYaw;
@@ -142,8 +143,8 @@ public class HoleSnap extends Module {
         for (int i = centerPos.getX() - searchRange.getValue(); i < centerPos.getX() + searchRange.getValue(); i++) {
             for (int j = centerPos.getY() - 4; j < centerPos.getY() + 2; j++) {
                 for (int k = centerPos.getZ() - searchRange.getValue(); k < centerPos.getZ() + searchRange.getValue(); k++) {
-                    BlockPos pos = new BlockPos(i, j, k);
-                    if (HoleUtility.isSingleHole(pos)) {
+                    BlockPos pos = new BlockPos(i, j, k);;
+                    if (HoleUtility.isSingleHole(pos) && InteractionUtility.isVecInFOV(pos.toCenterPos(), searchFOV.getValue() / 2)) {
                         blocks.add(new BlockPos(pos));
                     }
                 }

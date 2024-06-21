@@ -3,6 +3,8 @@ package thunder.hack.modules;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.PendingUpdateManager;
+import net.minecraft.client.network.SequencedPacketCreator;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.network.packet.Packet;
@@ -15,14 +17,17 @@ import thunder.hack.ThunderHack;
 import thunder.hack.core.impl.CommandManager;
 import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.gui.notification.Notification;
+import thunder.hack.injection.accesors.IClientWorldMixin;
 import thunder.hack.modules.client.ClientSettings;
+import thunder.hack.modules.client.Windows;
+import thunder.hack.modules.misc.UnHook;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.Bind;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 import static thunder.hack.modules.client.ClientSettings.isRu;
 
@@ -34,6 +39,18 @@ public abstract class Module {
     private final String description;
     private final Category category;
     private final String displayName;
+
+    private final List<String> ignoreSoundList = Arrays.asList(
+            "ClickGui",
+            "ThunderGui",
+            "HudEditor"
+    );
+
+    private final List<String> ignoredModules = Arrays.asList(
+            "ClickGui",
+            "ClientSettings",
+            "Rotations"
+    );
 
     public static final MinecraftClient mc = MinecraftClient.getInstance();
 
@@ -58,16 +75,11 @@ public abstract class Module {
     public void onUpdate() {
     }
 
-    public void onRenderShaders(DrawContext context) {
-    }
-
     public void onRender2D(DrawContext event) {
     }
 
-    public void onRender3D(MatrixStack event) {
-    }
 
-    public void onPreRender3D(MatrixStack stack) {
+    public void onRender3D(MatrixStack event) {
     }
 
     public void onUnload() {
@@ -77,6 +89,20 @@ public abstract class Module {
         if (mc.getNetworkHandler() == null) return;
 
         mc.getNetworkHandler().sendPacket(packet);
+    }
+
+    protected void sendPacketSilent(Packet<?> packet) {
+        if (mc.getNetworkHandler() == null) return;
+        ThunderHack.core.silentPackets.add(packet);
+        mc.getNetworkHandler().sendPacket(packet);
+    }
+
+    protected void sendSequencedPacket(SequencedPacketCreator packetCreator) {
+        if (mc.getNetworkHandler() == null || mc.world == null) return;
+        try (PendingUpdateManager pendingUpdateManager = ((IClientWorldMixin) mc.world).getPendingUpdateManager().incrementSequence();) {
+            int i = pendingUpdateManager.getSequence();
+            mc.getNetworkHandler().sendPacket(packetCreator.predict(i));
+        }
     }
 
     public String getDisplayInfo() {
@@ -99,18 +125,26 @@ public abstract class Module {
     }
 
     public void enable() {
-        enabled.setValue(true);
+        if (!(this instanceof UnHook))
+            enabled.setValue(true);
 
-        if (!fullNullCheck()) onEnable();
+        if (!fullNullCheck() || (this instanceof UnHook) || (this instanceof Windows))
+            onEnable();
+
         if (isOn()) ThunderHack.EVENT_BUS.subscribe(this);
         if (fullNullCheck()) return;
+        if (ignoredModules.contains(getDisplayName())) {
+            enabled.setValue(false);
+            return;
+        }
+
 
         LogUtils.getLogger().info("[ThunderHack] enabled " + this.getName());
         ThunderHack.moduleManager.sortModules();
 
-        if ((!Objects.equals(getDisplayName(), "ClickGui")) && (!Objects.equals(getDisplayName(), "ThunderGui"))) {
+        if (!ignoreSoundList.contains(getDisplayName())) {
             ThunderHack.notificationManager.publicity(getDisplayName(), isRu() ? "Модуль включен!" : "Was Enabled!", 2, Notification.Type.ENABLED);
-            ModuleManager.soundFX.playEnable();
+            ThunderHack.soundManager.playEnable();
         }
     }
 
@@ -131,13 +165,15 @@ public abstract class Module {
         ThunderHack.moduleManager.sortModules();
 
         if (fullNullCheck()) return;
+        if (ignoredModules.contains(getDisplayName())) enabled.setValue(false);
+
         onDisable();
 
         LogUtils.getLogger().info("[ThunderHack] disabled " + getName());
 
-        if ((!Objects.equals(getDisplayName(), "ClickGui")) && (!Objects.equals(getDisplayName(), "ThunderGui"))) {
+        if (!ignoreSoundList.contains(getDisplayName())) {
             ThunderHack.notificationManager.publicity(getDisplayName(), isRu() ? "Модуль выключен!" : "Was Disabled!", 2, Notification.Type.DISABLED);
-            ModuleManager.soundFX.playDisable();
+            ThunderHack.soundManager.playDisable();
         }
     }
 
@@ -187,7 +223,7 @@ public abstract class Module {
     }
 
     public static boolean fullNullCheck() {
-        return mc.player == null || mc.world == null;
+        return mc.player == null || mc.world == null || ModuleManager.unHook.isEnabled();
     }
 
     public String getName() {
@@ -232,6 +268,21 @@ public abstract class Module {
             }
         }
 
+        try {
+            for (Field field : getClass().getSuperclass().getSuperclass().getSuperclass().getDeclaredFields()) {
+                if (Setting.class.isAssignableFrom(field.getType())) {
+                    field.setAccessible(true);
+
+                    try {
+                        settingList.add((Setting<?>) field.get(this));
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
         settingList.forEach(s -> s.setModule(this));
 
         return settingList;
@@ -255,8 +306,13 @@ public abstract class Module {
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, id, 0, type, mc.player);
     }
 
+    public static void clickSlot(int id, int button, SlotActionType type) {
+        if (id == -1 || mc.interactionManager == null || mc.player == null) return;
+        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, id, button, type, mc.player);
+    }
+
     public void sendMessage(String message) {
-        if (fullNullCheck()) return;
+        if (fullNullCheck() || !ClientSettings.clientMessages.getValue() || ModuleManager.unHook.isEnabled()) return;
         mc.player.sendMessage(Text.of(CommandManager.getClientMessage() + " " + Formatting.GRAY + "[" + Formatting.DARK_PURPLE + getDisplayName() + Formatting.GRAY + "] " + message));
     }
 
@@ -266,17 +322,22 @@ public abstract class Module {
     }
 
     public boolean isKeyPressed(int button) {
-        if (button == -1)
+        if (button == -1 || ModuleManager.unHook.isEnabled())
             return false;
+
+        if (ThunderHack.moduleManager.activeMouseKeys.contains(button)) {
+            ThunderHack.moduleManager.activeMouseKeys.clear();
+            return true;
+        }
+
         return InputUtil.isKeyPressed(mc.getWindow().getHandle(), button);
     }
 
     public boolean isKeyPressed(Setting<Bind> bind) {
-        if (bind.getValue().getKey() == -1)
+        if (bind.getValue().getKey() == -1 || ModuleManager.unHook.isEnabled())
             return false;
         return InputUtil.isKeyPressed(mc.getWindow().getHandle(), bind.getValue().getKey());
     }
-
 
     public @Nullable Setting<?> getSettingByName(String name) {
         for (Setting<?> setting : getSettings()) {

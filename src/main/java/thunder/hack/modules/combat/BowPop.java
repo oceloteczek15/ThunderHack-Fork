@@ -5,7 +5,7 @@ import net.minecraft.network.packet.c2s.play.*;
 import thunder.hack.events.impl.PacketEvent;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.Timer;
 import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
@@ -20,30 +20,23 @@ public final class BowPop extends Module {
     public Setting<Float> scale = new Setting<>("Scale", 0.01f, 0.01f, 0.4f);
     public Setting<Boolean> minimize = new Setting<>("Minimize", false);
     public Setting<Float> delay = new Setting<>("Delay", 5f, 0f, 10f);
-    public final Setting<Parent> selection = new Setting<>("Selection", new Parent(false, 0));
-    public final Setting<Boolean> bow = new Setting<>("Bows", true).withParent(selection);
-    public final Setting<Boolean> pearls = new Setting<>("EPearls", true).withParent(selection);
-    public final Setting<Boolean> xp = new Setting<>("XP", true).withParent(selection);
-    public final Setting<Boolean> eggs = new Setting<>("Eggs", true).withParent(selection);
-    public final Setting<Boolean> potions = new Setting<>("SplashPotions", true).withParent(selection);
-    public final Setting<Boolean> snowballs = new Setting<>("Snowballs", true).withParent(selection);
+    public final Setting<SettingGroup> selection = new Setting<>("Selection", new SettingGroup(false, 0));
+    public final Setting<Boolean> bow = new Setting<>("Bows", true).addToGroup(selection);
+    public final Setting<Boolean> pearls = new Setting<>("EPearls", true).addToGroup(selection);
+    public final Setting<Boolean> xp = new Setting<>("XP", true).addToGroup(selection);
+    public final Setting<Boolean> eggs = new Setting<>("Eggs", true).addToGroup(selection);
+    public final Setting<Boolean> potions = new Setting<>("SplashPotions", true).addToGroup(selection);
+    public final Setting<Boolean> snowballs = new Setting<>("Snowballs", true).addToGroup(selection);
 
     public static Timer delayTimer = new Timer();
-    private static BowPop instance;
     private final Random rnd = new Random();
 
     public BowPop() {
         super("BowPop", Category.COMBAT);
-        instance = this;
     }
 
     @EventHandler
     private void onPacketSend(PacketEvent.Send event) {
-        if(event.getPacket() instanceof ClickSlotC2SPacket cs) {
-            sendMessage(cs.getSlot() + "");
-        }
-
-
         if (fullNullCheck() || !delayTimer.passedMs((long) (delay.getValue() * 1000))) return;
         if (event.getPacket() instanceof PlayerActionC2SPacket && ((PlayerActionC2SPacket) event.getPacket()).getAction() == PlayerActionC2SPacket.Action.RELEASE_USE_ITEM && (mc.player.getActiveItem().getItem() == Items.BOW && bow.getValue())
                 || event.getPacket() instanceof PlayerInteractItemC2SPacket && ((PlayerInteractItemC2SPacket) event.getPacket()).getHand() == Hand.MAIN_HAND && ((mc.player.getMainHandStack().getItem() == Items.ENDER_PEARL && pearls.getValue()) || (mc.player.getMainHandStack().getItem() == Items.EXPERIENCE_BOTTLE && xp.getValue()) || (mc.player.getMainHandStack().getItem() == Items.EGG && eggs.getValue()) || (mc.player.getMainHandStack().getItem() == Items.SPLASH_POTION && potions.getValue()) || (mc.player.getMainHandStack().getItem() == Items.SNOWBALL && snowballs.getValue()))) {
@@ -108,10 +101,6 @@ public final class BowPop extends Module {
         int n = rnd.nextInt(29000000);
         if (rnd.nextBoolean()) return n;
         return -n;
-    }
-
-    public static BowPop getInstance() {
-        return instance;
     }
 
     private enum exploitEn {

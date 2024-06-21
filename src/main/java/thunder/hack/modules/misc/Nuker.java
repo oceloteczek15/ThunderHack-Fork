@@ -7,6 +7,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.block.FluidBlock;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
@@ -27,6 +28,7 @@ import thunder.hack.modules.client.HudEditor;
 import thunder.hack.modules.player.SpeedMine;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
+import thunder.hack.setting.impl.ItemSelectSetting;
 import thunder.hack.utility.Timer;
 import thunder.hack.utility.math.ExplosionUtility;
 import thunder.hack.utility.player.InteractionUtility;
@@ -45,6 +47,7 @@ public class Nuker extends Module {
         super("Nuker", Category.MISC);
     }
 
+    public final Setting<ItemSelectSetting> selectedBlocks = new Setting<>("SelectedBlocks", new ItemSelectSetting(new ArrayList<>()));
     private final Setting<Mode> mode = new Setting<>("Mode", Mode.Default);
     private final Setting<Integer> delay = new Setting<>("Delay", 25, 0, 1000);
     private final Setting<BlockSelection> blocks = new Setting<>("Blocks", BlockSelection.Select);
@@ -55,7 +58,6 @@ public class Nuker extends Module {
     private final Setting<Float> range = new Setting<>("Range", 4.2f, 1.5f, 25f);
     private final Setting<ColorMode> colorMode = new Setting<>("ColorMode", ColorMode.Sync);
     public final Setting<ColorSetting> color = new Setting<>("Color", new ColorSetting(0x2250b4b4), v -> colorMode.getValue() == ColorMode.Custom);
-    public static ArrayList<Block> selectedBlocks = new ArrayList<>();
 
     private Block targetBlockType;
     private BlockData blockData;
@@ -152,9 +154,9 @@ public class Nuker extends Module {
                 BlockState state = mc.world.getBlockState(b);
 
                 if (PlayerUtility.squaredDistanceFromEyes(b.toCenterPos()) <= range.getPow2Value()) {
-                    if (state.getBlock() == targetBlockType || (blocks.getValue().equals(BlockSelection.All) && state.getBlock() != BEDROCK)) {
+                    if (isAllowed(state.getBlock())) {
                         try {
-                            sendPacket(new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, b, Direction.UP, PlayerUtility.getWorldActionId(mc.world)));
+                            sendSequencedPacket(id -> new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, b, Direction.UP, id));
                             mc.interactionManager.breakBlock(b);
                             mc.player.swingHand(Hand.MAIN_HAND);
                         } catch (Exception ignored) {
@@ -262,7 +264,7 @@ public class Nuker extends Module {
     }
 
     private boolean isAllowed(Block block) {
-        boolean allowed = selectedBlocks.contains(block);
+        boolean allowed = selectedBlocks.getValue().getItemsById().contains(block.getTranslationKey().replace("block.minecraft.", ""));
         return switch (blocks.getValue()) {
             case All -> block != BEDROCK && block != AIR && block != CAVE_AIR && !(block instanceof FluidBlock) ;
             case Select -> block == targetBlockType;

@@ -9,10 +9,8 @@ import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.minecraft.util.math.BlockPos;
 import thunder.hack.core.Core;
 import thunder.hack.core.impl.*;
-import thunder.hack.gui.mainmenu.CreditsScreen;
-import thunder.hack.gui.notification.NotificationManager;
+import thunder.hack.core.impl.NotificationManager;
 import thunder.hack.modules.client.RPC;
-import thunder.hack.utility.SoundUtility;
 import thunder.hack.utility.ThunderUtility;
 import thunder.hack.utility.render.Render2DEngine;
 
@@ -26,9 +24,13 @@ import java.nio.charset.StandardCharsets;
 
 public class ThunderHack implements ModInitializer {
     public static final ModMetadata MOD_META;
+
     public static final String MOD_ID = "thunderhack";
+    public static final String VERSION = "1.6b305";
+    public static String GITH_HASH = "0";
+    public static String BUILD_DATE = "1 Jan 1970";
+
     public static final IEventBus EVENT_BUS = new EventBus();
-    public static final String VERSION = "1.4b2212";
 
     public static boolean isOutdated = false;
     public static float TICK_TIMER = 1f;
@@ -37,6 +39,7 @@ public class ThunderHack implements ModInitializer {
     public static long initTime;
     public static KeyListening currentKeyListener;
     public static String[] contributors = new String[16];
+    public static boolean baritone = false;
 
     /*-----------------    Managers  ---------------------*/
     public static NotificationManager notificationManager = new NotificationManager();
@@ -51,6 +54,7 @@ public class ThunderHack implements ModInitializer {
     public static AsyncManager asyncManager = new AsyncManager();
     public static MacroManager macroManager = new MacroManager();
     public static CommandManager commandManager = new CommandManager();
+    public static SoundManager soundManager = new SoundManager();
     public static Core core = new Core();
     /*--------------------------------------------------------*/
 
@@ -78,22 +82,14 @@ public class ThunderHack implements ModInitializer {
         FriendManager.loadFriends();
         configManager.load(configManager.getCurrentConfig());
         moduleManager.onLoad();
-        configManager.loadChestStealer();
-        configManager.loadInvCleaner();
-        configManager.loadAutoBuy();
-        configManager.loadSearch();
-        configManager.loadNuker();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if(ModuleManager.unHook.isEnabled())
+                ModuleManager.unHook.disable();
             FriendManager.saveFriends();
             configManager.save(configManager.getCurrentConfig());
             wayPointManager.saveWayPoints();
             macroManager.saveMacro();
-            configManager.saveChestStealer();
-            configManager.saveSearch();
-            configManager.saveNuker();
-            configManager.saveInvCleaner();
-            configManager.saveAutoBuy();
         }));
 
         macroManager.onLoad();
@@ -101,14 +97,19 @@ public class ThunderHack implements ModInitializer {
 
         Render2DEngine.initShaders();
 
-        SoundUtility.registerSounds();
+        BUILD_DATE = ThunderUtility.readManifestField("Build-Timestamp");
+        GITH_HASH = ThunderUtility.readManifestField("Git-Commit");
+        
+        soundManager.registerSounds();
         syncVersion();
         syncContributors();
-        ThunderUtility.parseChangeLog();
-
-        if (isOnWindows())
-            RPC.getInstance().startRpc();
-
+        ThunderUtility.parseStarGazer();
+        ThunderUtility.parseCommits();
+        ModuleManager.rpc.startRpc();
+        try {
+            Class.forName("baritone.api.BaritoneAPI");
+            baritone = true;
+        } catch (ClassNotFoundException e) {}
         LogUtils.getLogger().info("""
                 \n /$$$$$$$$ /$$                                 /$$                     /$$   /$$                     /$$     \s
                 |__  $$__/| $$                                | $$                    | $$  | $$                    | $$     \s
@@ -121,13 +122,12 @@ public class ThunderHack implements ModInitializer {
                    \n \t\t\t\t\t\tBy\s""" + ThunderUtility.getAuthors());
 
         LogUtils.getLogger().info("[ThunderHack] Init time: " + (System.currentTimeMillis() - initTime) + " ms.");
-
         initTime = System.currentTimeMillis();
     }
 
     public static void syncVersion() {
         try {
-            if (!new BufferedReader(new InputStreamReader(new URL("https://raw.githubusercontent.com/Pan4ur/THRecodeUtil/main/syncVersion.txt").openStream())).readLine().equals(VERSION))
+            if (!new BufferedReader(new InputStreamReader(new URL("https://raw.githubusercontent.com/Pan4ur/THRecodeUtil/main/syncVersionBeta.txt").openStream())).readLine().equals(VERSION))
                 isOutdated = true;
         } catch (Exception ignored) {
         }
@@ -147,10 +147,6 @@ public class ThunderHack implements ModInitializer {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public static boolean isOnWindows() {
-        return System.getProperty("os.name").startsWith("Windows");
     }
 
     public static boolean isFuturePresent() {

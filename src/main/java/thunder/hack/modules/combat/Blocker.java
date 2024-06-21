@@ -10,9 +10,9 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3i;
 import org.jetbrains.annotations.NotNull;
 import thunder.hack.events.impl.*;
-import thunder.hack.modules.base.IndestructibleModule;
+import thunder.hack.modules.base.PlaceModule;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.player.InteractionUtility;
 import thunder.hack.utility.world.HoleUtility;
 
@@ -22,29 +22,27 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import static thunder.hack.modules.client.ClientSettings.isRu;
 
-public final class Blocker extends IndestructibleModule {
+public final class Blocker extends PlaceModule {
     private final Setting<Integer> actionShift = new Setting<>("Place Per Tick", 1, 1, 5);
     private final Setting<Integer> actionInterval = new Setting<>("Delay", 0, 0, 5);
 
-    private final Setting<Parent> logic = new Setting<>("Logic", new Parent(false, 0));
-    private final Setting<Boolean> antiCev = new Setting<>("Anti Cev", true).withParent(logic);
-    private final Setting<Boolean> antiCiv = new Setting<>("Anti Civ", true).withParent(logic);
-    private final Setting<Boolean> expand = new Setting<>("Expand", true).withParent(logic);
-    private final Setting<Boolean> antiTntAura = new Setting<>("Anti TNT", false).withParent(logic);
-    private final Setting<Boolean> antiAutoAnchor = new Setting<>("Anti Anchor", false).withParent(logic);
+    private final Setting<SettingGroup> logic = new Setting<>("Logic", new SettingGroup(false, 0));
+    private final Setting<Boolean> antiCev = new Setting<>("Anti Cev", true).addToGroup(logic);
+    private final Setting<Boolean> antiCiv = new Setting<>("Anti Civ", true).addToGroup(logic);
+    private final Setting<Boolean> expand = new Setting<>("Expand", true).addToGroup(logic);
+    private final Setting<Boolean> antiTntAura = new Setting<>("Anti TNT", false).addToGroup(logic);
+    private final Setting<Boolean> antiAutoAnchor = new Setting<>("Anti Anchor", false).addToGroup(logic);
 
-    private final Setting<Parent> detect = new Setting<>("Detect", new Parent(false, 1)).withParent(logic);
-    private final Setting<Boolean> onPacket = new Setting<>("On Break Packet", true).withParent(detect);
-    private final Setting<Boolean> onAttackBlock = new Setting<>("On Attack Block", false).withParent(detect);
-    private final Setting<Boolean> onBreak = new Setting<>("On Break", true).withParent(detect);
+    private final Setting<SettingGroup> detect = new Setting<>("Detect", new SettingGroup(false, 1)).addToGroup(logic);
+    private final Setting<Boolean> onPacket = new Setting<>("On Break Packet", true).addToGroup(detect);
+    private final Setting<Boolean> onAttackBlock = new Setting<>("On Attack Block", false).addToGroup(detect);
+    private final Setting<Boolean> onBreak = new Setting<>("On Break", true).addToGroup(detect);
 
     private final List<BlockPos> placePositions = new CopyOnWriteArrayList<>();
-    private static Blocker instance;
     private int tickCounter = 0;
 
     public Blocker() {
         super("Blocker", Category.COMBAT);
-        instance = this;
     }
 
     @Override
@@ -122,10 +120,6 @@ public final class Blocker extends IndestructibleModule {
                 && antiAutoAnchor.getValue()) {
             placePositions.add(event.getBlockPos());
         }
-    }
-
-    public static Blocker getInstance() {
-        return instance;
     }
 
     private void doLogic(BlockPos pos) {

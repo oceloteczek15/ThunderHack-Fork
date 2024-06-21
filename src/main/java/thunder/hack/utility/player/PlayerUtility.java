@@ -1,21 +1,39 @@
 package thunder.hack.utility.player;
 
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.*;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Vec2f;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 import org.jetbrains.annotations.NotNull;
-import thunder.hack.injection.accesors.IClientWorldMixin;
-import thunder.hack.utility.math.MathUtility;
+
+import java.util.Objects;
 
 import static thunder.hack.modules.Module.mc;
 
 public final class PlayerUtility {
+
+    public static boolean isInHell() {
+        if (mc.world == null) return false;
+        return Objects.equals(mc.world.getRegistryKey().getValue().getPath(), "the_nether");
+    }
+
+    public static boolean isInEnd() {
+        if (mc.world == null) return false;
+        return Objects.equals(mc.world.getRegistryKey().getValue().getPath(), "the_end");
+    }
+
+    public static boolean isInOver() {
+        if (mc.world == null) return false;
+        return Objects.equals(mc.world.getRegistryKey().getValue().getPath(), "overworld");
+    }
+
     public static boolean isEating() {
         if (mc.player == null) return false;
 
-        return (mc.player.getMainHandStack().isFood() || mc.player.getOffHandStack().isFood())
+        return (mc.player.getMainHandStack().getComponents().contains(DataComponentTypes.FOOD) || mc.player.getOffHandStack().getComponents().contains(DataComponentTypes.FOOD))
                 && mc.player.isUsingItem();
     }
 
@@ -46,20 +64,9 @@ public final class PlayerUtility {
         return mc.player;
     }
 
-    public static int getWorldActionId(ClientWorld world) {
-        PendingUpdateManager pum = getUpdateManager(world);
-        int p = pum.getSequence();
-        pum.close();
-        return p;
-    }
-
     public static float calculatePercentage(@NotNull ItemStack stack) {
         float durability = stack.getMaxDamage() - stack.getDamage();
         return (durability / (float) stack.getMaxDamage()) * 100F;
-    }
-
-    private static PendingUpdateManager getUpdateManager(ClientWorld world) {
-        return ((IClientWorldMixin) world).acquirePendingUpdateManager();
     }
 
     public static float fixAngle(float angle) {
@@ -76,5 +83,19 @@ public final class PlayerUtility {
         double d = mc.player.getX() - x;
         double f = mc.player.getZ() - z;
         return (float) (d * d + f * f);
+    }
+
+    public static float getSquaredDistance2D(Vec3d vec) {
+        double d0 = mc.player.getX() - vec.getX();
+        double d2 = mc.player.getZ() - vec.getZ();
+        return (float) (d0 * d0 + d2 * d2);
+    }
+
+    public static boolean canSee(Vec3d pos) {
+        Vec3d vec3d = new Vec3d(mc.player.getX(), mc.player.getEyeY(), mc.player.getZ());
+        if (pos.distanceTo(vec3d) > 128.0)
+            return false;
+        else
+            return mc.world.raycast(new RaycastContext(vec3d, pos, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player)).getType() == HitResult.Type.MISS;
     }
 }

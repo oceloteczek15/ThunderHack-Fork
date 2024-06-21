@@ -3,6 +3,7 @@ package thunder.hack.gui.thundergui;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.StringHelper;
 import org.lwjgl.glfw.GLFW;
 import thunder.hack.ThunderHack;
 import thunder.hack.cmd.Command;
@@ -12,8 +13,9 @@ import thunder.hack.gui.thundergui.components.*;
 import thunder.hack.modules.Module;
 import thunder.hack.modules.client.ThunderHackGui;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.Parent;
-import thunder.hack.utility.render.MSAAFramebuffer;
+import thunder.hack.setting.impl.BooleanSettingGroup;
+import thunder.hack.setting.impl.ColorSetting;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.render.Render2DEngine;
 import thunder.hack.utility.render.animation.BetterAnimation;
 
@@ -160,14 +162,13 @@ public class ThunderGui extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        if (Module.fullNullCheck()) renderBackground(context, mouseX, mouseY, delta);
+        if (Module.fullNullCheck())
+            renderBackground(context, mouseX, mouseY, delta);
         context.getMatrices().push();
         mouse_x = mouseX;
         mouse_y = mouseY;
         if (open_animation.getAnimationd() > 0) {
-            MSAAFramebuffer.use(true, () -> {
-                renderGui(context, mouseX, mouseY, delta);
-            });
+            renderGui(context, mouseX, mouseY, delta);
         }
         if (open_animation.getAnimationd() <= 0.01 && !open_direction) {
             open_animation = new BetterAnimation();
@@ -274,19 +275,19 @@ public class ThunderGui extends Screen {
 
             if (selected_plate != null) {
                 for (Setting<?> setting : selected_plate.getModule().getSettings()) {
-                    if (setting.getValue() instanceof Parent) {
+                    if (setting.getValue() instanceof SettingGroup) {
                         settings.add(new ParentComponent(setting));
                     }
                     if (setting.getValue() instanceof Boolean && !setting.getName().equals("Enabled") && !setting.getName().equals("Drawn")) {
                         settings.add(new BooleanComponent(setting));
                     }
-                    if (setting.isBooleanParent()) {
+                    if (setting.getValue() instanceof BooleanSettingGroup) {
                         settings.add(new BooleanParentComponent(setting));
                     }
-                    if (setting.isEnumSetting()) {
+                    if (setting.getValue().getClass().isEnum()) {
                         settings.add(new ModeComponent(setting));
                     }
-                    if (setting.isColorSetting()) {
+                    if (setting.getValue() instanceof ColorSetting) {
                         settings.add(new ColorPickerComponent(setting));
                     }
                     if (setting.isNumberSetting() && setting.hasRestriction()) {
@@ -353,7 +354,7 @@ public class ThunderGui extends Screen {
         } else {
             Render2DEngine.drawRound(context.getMatrices(), main_posX + 105, main_posY + 14, 11, 11, 3f, new Color(52, 38, 58, 250));
         }
-        FontRenderers.modules.drawString(context.getMatrices(), "current cfg: " + ThunderHack.configManager.currentConfig.getName(), main_posX + 120, main_posY + 18, new Color(0xCDFFFFFF, true).getRGB(), false);
+        FontRenderers.modules.drawString(context.getMatrices(), "current cfg: " + ThunderHack.configManager.currentConfig.getName(), main_posX + 120, main_posY + 18, new Color(0xCDFFFFFF, true).getRGB());
         FontRenderers.icons.drawString(context.getMatrices(), "t", main_posX + 106, main_posY + 17, new Color(0xC2FFFFFF, true).getRGB());
 
         // Поиск
@@ -375,14 +376,14 @@ public class ThunderGui extends Screen {
         }
 
         if (currentMode == CurrentMode.Modules)
-            FontRenderers.modules.drawString(context.getMatrices(), search_string, main_posX + 252, main_posY + 19, searching ? new Color(0xCBFFFFFF, true).getRGB() : new Color(0x83FFFFFF, true).getRGB(), false);
+            FontRenderers.modules.drawString(context.getMatrices(), search_string, main_posX + 252, main_posY + 19, searching ? new Color(0xCBFFFFFF, true).getRGB() : new Color(0x83FFFFFF, true).getRGB());
         if (currentMode == CurrentMode.CfgManager) {
-            FontRenderers.modules.drawString(context.getMatrices(), config_string, main_posX + 252, main_posY + 19, listening_config ? new Color(0xCBFFFFFF, true).getRGB() : new Color(0x83FFFFFF, true).getRGB(), false);
+            FontRenderers.modules.drawString(context.getMatrices(), config_string, main_posX + 252, main_posY + 19, listening_config ? new Color(0xCBFFFFFF, true).getRGB() : new Color(0x83FFFFFF, true).getRGB());
             Render2DEngine.drawRound(context.getMatrices(), main_posX + 368, main_posY + 17, 20, 6, 1f, isHoveringItem(main_posX + 368, main_posY + 17, 20, 6, mouseX, mouseY) ? new Color(59, 42, 63, 194) : new Color(33, 23, 35, 194));
             FontRenderers.modules.drawCenteredString(context.getMatrices(), "+", main_posX + 378, main_posY + 16, ThunderHackGui.getColorByTheme(2).getRGB());
         }
         if (currentMode == CurrentMode.FriendManager) {
-            FontRenderers.modules.drawString(context.getMatrices(), friend_string, main_posX + 252, main_posY + 19, listening_friend ? new Color(0xCBFFFFFF, true).getRGB() : new Color(0x83FFFFFF, true).getRGB(), false);
+            FontRenderers.modules.drawString(context.getMatrices(), friend_string, main_posX + 252, main_posY + 19, listening_friend ? new Color(0xCBFFFFFF, true).getRGB() : new Color(0x83FFFFFF, true).getRGB());
             Render2DEngine.drawRound(context.getMatrices(), main_posX + 368, main_posY + 17, 20, 6, 1f, isHoveringItem(main_posX + 368, main_posY + 17, 20, 6, mouseX, mouseY) ? new Color(59, 42, 63, 194) : new Color(33, 23, 35, 194));
             FontRenderers.modules.drawCenteredString(context.getMatrices(), "+", main_posX + 378, main_posY + 16, ThunderHackGui.getColorByTheme(2).getRGB());
         }
@@ -578,7 +579,7 @@ public class ThunderGui extends Screen {
                 module_y += 35;
             }
 
-            if (keyCode == GLFW.GLFW_KEY_ENTER) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
                 search_string = "Search";
                 searching = false;
                 return;
@@ -587,8 +588,7 @@ public class ThunderGui extends Screen {
                 search_string = (removeLastChar(search_string));
                 return;
             }
-
-            search_string = (search_string + typedChar);
+            if(keyCode >= GLFW.GLFW_KEY_A && keyCode <= GLFW.GLFW_KEY_Z || keyCode >= GLFW.GLFW_KEY_0 && keyCode <= GLFW.GLFW_KEY_9) search_string = (search_string + typedChar);
         }
         if (listening_config) {
             if (config_string.equalsIgnoreCase("Save config")) {

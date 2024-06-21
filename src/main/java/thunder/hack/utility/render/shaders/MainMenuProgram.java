@@ -4,10 +4,13 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.SimpleFramebuffer;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
 import org.lwjgl.opengl.GL30;
+import thunder.hack.modules.client.HudEditor;
 import thunder.hack.utility.render.WindowResizeCallback;
+import thunder.hack.utility.render.animation.AnimationUtility;
 
 import static thunder.hack.modules.Module.mc;
 
@@ -15,8 +18,9 @@ public class MainMenuProgram extends GlProgram {
 
     private GlUniform Time;
     private GlUniform uSize;
+    private GlUniform color;
     private Framebuffer input;
-    public static float time_ = 0f;
+    public static float time_ = 10000f;
 
     public MainMenuProgram() {
         super(new Identifier("thunderhack", "mainmenu"), VertexFormats.POSITION);
@@ -27,12 +31,11 @@ public class MainMenuProgram extends GlProgram {
     }
 
     public void setParameters(float x, float y, float width, float height) {
-        this.uSize.set(width * mc.options.getGuiScale().getValue(), height * mc.options.getGuiScale().getValue());
+        float i = (float) mc.getWindow().getScaleFactor();
+        this.uSize.set(width * i, height * i);
+        time_ += (float) (0.55 * AnimationUtility.deltaTime());
         this.Time.set((float) time_);
-    }
-
-    public static void increaseTime() {
-        time_ += 0.025f;
+        //     this.color.set(HudEditor.getColor(0).getRed() / 255f, HudEditor.getColor(0).getGreen() / 255f, HudEditor.getColor(0).getBlue() / 255f, HudEditor.getColor(0).getAlpha() / 255f);
     }
 
     @Override
@@ -49,6 +52,7 @@ public class MainMenuProgram extends GlProgram {
     protected void setup() {
         this.uSize = this.findUniform("uSize");
         this.Time = this.findUniform("Time");
+        this.color = this.findUniform("color");
         var window = MinecraftClient.getInstance().getWindow();
         this.input = new SimpleFramebuffer(window.getFramebufferWidth(), window.getFramebufferHeight(), false, MinecraftClient.IS_SYSTEM_MAC);
     }

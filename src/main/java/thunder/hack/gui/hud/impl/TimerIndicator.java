@@ -1,7 +1,8 @@
 package thunder.hack.gui.hud.impl;
 
 import net.minecraft.client.gui.DrawContext;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.Formatting;
+import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.gui.hud.HudElement;
 import thunder.hack.modules.client.HudEditor;
@@ -16,32 +17,26 @@ public class TimerIndicator extends HudElement {
     private final BetterDynamicAnimation timerAnimation = new BetterDynamicAnimation();
 
     public TimerIndicator() {
-        super("TimerIndicator", 65, 15);
+        super("TimerIndicator", 60, 10);
     }
 
     @Override
     public void onRender2D(DrawContext context) {
         super.onRender2D(context);
 
-    }
-
-    @Override
-    public void onRenderShaders(@NotNull DrawContext context) {
-        Render2DEngine.drawHudBase(context.getMatrices(), getPosX(), getPosY(), 61, 12, 3);
-
-        int status;
-        float timerStatus;
-
-        float f4 = 100 / Timer.speed.getValue();
-        float f5 = Math.min(Timer.violation, f4);
-        timerAnimation.setValue(((f4 - f5) / f4) * 58);
-        timerStatus = (float) timerAnimation.getAnimationD();
-        status = (int) (((f4 - f5) / f4) * 100);
-        status = MathUtility.clamp(status, 0, 100);
-        timerStatus = MathUtility.clamp(timerStatus, 5, 58);
-
-        Render2DEngine.drawGradientRound(context.getMatrices(), getPosX() + 1.5f, getPosY() + 1f, (int) timerStatus, 9, HudEditor.hudRound.getValue() - 4, HudEditor.getColor(90), HudEditor.getColor(180), HudEditor.getColor(0), HudEditor.getColor(270));
-        FontRenderers.sf_bold_mini.drawCenteredString(context.getMatrices(), status >= 99 ? "100%" : status + "%", getPosX() + 31, getPosY() + 2, new Color(200, 200, 200, 255).getRGB());
+        if (HudEditor.hudStyle.is(HudEditor.HudStyle.Blurry)) {
+            Render2DEngine.drawRoundedBlur(context.getMatrices(), getPosX(), getPosY(), 65, 15f, 3, HudEditor.blurColor.getValue().getColorObject());
+            Render2DEngine.drawRect(context.getMatrices(), getPosX(), getPosY(), 65 * Timer.energy, 15f, 3f, 0.4f);
+            FontRenderers.sf_bold_mini.drawCenteredString(context.getMatrices(), Timer.energy >= 0.99f ? "100%" : (int) Math.ceil(Timer.energy * 100) + "%", getPosX() + 32, getPosY() + 5.5f, new Color(200, 200, 200, 255).getRGB());
+            setBounds(getPosX(), getPosY(), 65, 15);
+        } else {
+            Render2DEngine.drawGradientBlurredShadow(context.getMatrices(), getPosX() - 1, getPosY() - 1, 62, 12, 6, HudEditor.getColor(90), HudEditor.getColor(180), HudEditor.getColor(0), HudEditor.getColor(270));
+            Render2DEngine.drawRect(context.getMatrices(), getPosX(), getPosY(), 60, 10, new Color(0x9E000000, true));
+            Render2DEngine.draw2DGradientRect(context.getMatrices(), getPosX(), getPosY(), getPosX() + 60 * Timer.energy, getPosY() + 10, HudEditor.getColor(90), HudEditor.getColor(180), HudEditor.getColor(0), HudEditor.getColor(270));
+            Render2DEngine.drawBlurredShadow(context.getMatrices(), getPosX() + 20, getPosY(), 22, 10, 6, new Color(0x47000000, true));
+            FontRenderers.sf_bold_mini.drawCenteredString(context.getMatrices(), Timer.energy >= 0.99f ? "100%" : (int) Math.ceil(Timer.energy * 100) + "%", getPosX() + 31, getPosY() + 3.5f, new Color(200, 200, 200, 255).getRGB());
+            setBounds(getPosX(), getPosY(), 60, 10);
+        }
     }
 
     @Override

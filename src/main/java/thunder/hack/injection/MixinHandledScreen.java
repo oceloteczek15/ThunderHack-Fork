@@ -10,19 +10,17 @@ import net.minecraft.client.gui.screen.ingame.ScreenHandlerProvider;
 import net.minecraft.client.render.DiffuseLighting;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.inventory.Inventories;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.component.type.MapIdComponent;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.*;
 import net.minecraft.item.map.MapState;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ShulkerBoxScreenHandler;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.collection.DefaultedList;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
@@ -36,17 +34,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import thunder.hack.core.Core;
 import thunder.hack.core.impl.ModuleManager;
 import thunder.hack.gui.misc.PeekScreen;
+import thunder.hack.modules.Module;
 import thunder.hack.modules.render.Tooltips;
 import thunder.hack.utility.Timer;
 import thunder.hack.utility.render.Render2DEngine;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 import static thunder.hack.modules.Module.mc;
 import static thunder.hack.modules.render.Tooltips.hasItems;
+import static thunder.hack.utility.render.Render2DEngine.CONTAINER_BACKGROUND;
 
 @Mixin(value = {HandledScreen.class})
 public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen implements ScreenHandlerProvider<T> {
@@ -69,6 +66,7 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
 
     @Inject(method = "render", at = @At("HEAD"))
     private void drawScreenHook(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (Module.fullNullCheck()) return;
         for (int i1 = 0; i1 < mc.player.currentScreenHandler.slots.size(); ++i1) {
             Slot slot = mc.player.currentScreenHandler.slots.get(i1);
             if (isPointOverSlot(slot, mouseX, mouseY) && slot.isEnabled()) {
@@ -88,7 +86,6 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
         return Core.hold_mouse0;
     }
 
-
     @Shadow
     @Nullable
     protected Slot focusedSlot;
@@ -97,14 +94,13 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
     @Shadow
     protected int y;
 
-    private static final Identifier CONTAINER_BACKGROUND = new Identifier("textures/container.png");
-    private static final Identifier MAP_BACKGROUND = new Identifier("textures/map_background.png");
     private static final ItemStack[] ITEMS = new ItemStack[27];
 
     private Map<Render2DEngine.Rectangle, Integer> clickableRects = new HashMap<>();
 
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (Module.fullNullCheck()) return;
         if (focusedSlot != null && !focusedSlot.getStack().isEmpty() && client.player.playerScreenHandler.getCursorStack().isEmpty()) {
             if (hasItems(focusedSlot.getStack()) && Tooltips.storage.getValue()) {
                 renderShulkerToolTip(context, mouseX, mouseY, 0, 0, focusedSlot.getStack());
@@ -149,18 +145,24 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
                 }
             }
 
-            if(postRender != null) {
+            if (postRender != null) {
                 postRender.run();
                 postRender = null;
             }
         }
     }
 
+    @Inject(method = "drawSlot(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/screen/slot/Slot;)V", at = @At("TAIL"))
+    protected void drawSlotHook(DrawContext context, Slot slot, CallbackInfo ci) {
+        if (ModuleManager.fTHelper.isEnabled() && ModuleManager.fTHelper.aucHelper.getValue())
+            ModuleManager.fTHelper.onRenderChest(context, slot);
+    }
+
     public boolean renderShulkerToolTip(DrawContext context, int offsetX, int offsetY, int mouseX, int mouseY, ItemStack stack) {
         try {
-            NbtCompound compoundTag = stack.getSubNbt("BlockEntityTag");
-            DefaultedList<ItemStack> itemStacks = DefaultedList.ofSize(27, ItemStack.EMPTY);
-            Inventories.readNbt(compoundTag, itemStacks);
+            ContainerComponent compoundTag = stack.get(DataComponentTypes.CONTAINER);
+            if (compoundTag == null)
+                return false;
 
             float[] colors = new float[]{1F, 1F, 1F};
             Item focusedItem = stack.getItem();
@@ -171,7 +173,7 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
                     colors = new float[]{1F, 1F, 1F};
                 }
             }
-            draw(context, itemStacks, offsetX, offsetY, mouseX, mouseY, colors);
+            draw(context, compoundTag.stream().toList(), offsetX, offsetY, mouseX, mouseY, colors);
         } catch (Exception ignore) {
             return false;
         }
@@ -181,12 +183,14 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
 
     @Inject(method = "drawMouseoverTooltip", at = @At("HEAD"), cancellable = true)
     private void onDrawMouseoverTooltip(DrawContext context, int x, int y, CallbackInfo ci) {
+        if (Module.fullNullCheck()) return;
         if (focusedSlot != null && !focusedSlot.getStack().isEmpty() && client.player.playerScreenHandler.getCursorStack().isEmpty()) {
             if (focusedSlot.getStack().getItem() == Items.FILLED_MAP && Tooltips.maps.getValue()) ci.cancel();
         }
     }
 
-    private void draw(DrawContext context, DefaultedList<ItemStack> itemStacks, int offsetX, int offsetY, int mouseX, int mouseY, float[] colors) {
+    @Unique
+    private void draw(DrawContext context, List<ItemStack> itemStacks, int offsetX, int offsetY, int mouseX, int mouseY, float[] colors) {
         RenderSystem.disableDepthTest();
         GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
 
@@ -231,12 +235,8 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 
         int y1 = y - 12;
-        int y2 = y1 + 100;
         int x1 = x + 8;
-        int x2 = x1 + 100;
         int z = 300;
-
-        context.drawTexture(MAP_BACKGROUND, x1, y1, x2, y2, 0, 0);
 
         MapState mapState = FilledMapItem.getMapState(stack, client.world);
 
@@ -250,29 +250,26 @@ public abstract class MixinHandledScreen<T extends ScreenHandler> extends Screen
             context.getMatrices().translate(x1, y1, z);
             context.getMatrices().scale((float) scale, (float) scale, 0);
             VertexConsumerProvider.Immediate consumer = client.getBufferBuilders().getEntityVertexConsumers();
-            client.gameRenderer.getMapRenderer().draw(context.getMatrices(), consumer, FilledMapItem.getMapId(stack), mapState, false, 0xF000F0);
+            client.gameRenderer.getMapRenderer().draw(context.getMatrices(), consumer, (MapIdComponent) stack.get(DataComponentTypes.MAP_ID), mapState, false, 0xF000F0);
         }
         context.getMatrices().pop();
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void mouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        if (Module.fullNullCheck()) return;
         if (button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE && focusedSlot != null && !focusedSlot.getStack().isEmpty() && client.player.playerScreenHandler.getCursorStack().isEmpty()) {
             ItemStack itemStack = focusedSlot.getStack();
 
             if (hasItems(itemStack) && Tooltips.middleClickOpen.getValue()) {
 
                 Arrays.fill(ITEMS, ItemStack.EMPTY);
-                NbtCompound nbt = itemStack.getNbt();
+                ContainerComponent nbt = itemStack.get(DataComponentTypes.CONTAINER);
 
-                if (nbt != null && nbt.contains("BlockEntityTag")) {
-                    NbtCompound nbt2 = nbt.getCompound("BlockEntityTag");
-                    if (nbt2 != null && nbt2.contains("Items")) {
-                        NbtList nbt3 = nbt2.getList("Items", 10);
-                        for (int i = 0; i < nbt3.size(); i++) {
-                            ITEMS[nbt3.getCompound(i).getByte("Slot")] = ItemStack.fromNbt(nbt3.getCompound(i));
-                        }
-                    }
+                if (nbt != null) {
+                    List<ItemStack> list = nbt.stream().toList();
+                    for (int i = 0; i < list.size(); i++)
+                        ITEMS[i] = list.get(i);
                 }
 
                 client.setScreen(new PeekScreen(new ShulkerBoxScreenHandler(0, client.player.getInventory(), new SimpleInventory(ITEMS)), client.player.getInventory(), focusedSlot.getStack().getName(), ((BlockItem) focusedSlot.getStack().getItem()).getBlock()));

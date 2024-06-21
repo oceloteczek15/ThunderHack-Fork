@@ -1,32 +1,17 @@
 package thunder.hack.core.impl;
 
 import com.google.gson.*;
-import net.minecraft.block.Block;
-import net.minecraft.util.Pair;
-import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 import thunder.hack.ThunderHack;
 import thunder.hack.cmd.Command;
-import thunder.hack.cmd.impl.NukerCommand;
-import thunder.hack.cmd.impl.SearchCommand;
 import thunder.hack.core.IManager;
-import thunder.hack.gui.autobuy.AutoBuyItem;
 import thunder.hack.modules.Module;
-import thunder.hack.modules.client.AutoBuy;
-import thunder.hack.modules.client.ClientSettings;
-import thunder.hack.modules.misc.Nuker;
-import thunder.hack.modules.render.Search;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.*;
-import thunder.hack.utility.player.InventoryUtility;
 
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -38,108 +23,48 @@ public class ConfigManager implements IManager {
     public static final String CONFIG_FOLDER_NAME = "ThunderHackRecode";
     public static final File MAIN_FOLDER = new File(mc.runDirectory, CONFIG_FOLDER_NAME);
     public static final File CONFIGS_FOLDER = new File(MAIN_FOLDER, "configs");
-    public static final File AUTOBUY_FOLDER = new File(MAIN_FOLDER, "autobuy");
     public static final File TEMP_FOLDER = new File(MAIN_FOLDER, "temp");
     public static final File MISC_FOLDER = new File(MAIN_FOLDER, "misc");
     public static final File SOUNDS_FOLDER = new File(MISC_FOLDER, "sounds");
+    public static final File IMAGES_FOLDER = new File(MISC_FOLDER, "images");
+    public static final File TABPARSER_FOLDER = new File(MISC_FOLDER, "tabparser");
+    public static final File STASHLOGGER_FOLDER = new File(MISC_FOLDER, "stashlogger");
 
     public File currentConfig = null;
 
     public static boolean firstLaunch = false;
 
     public ConfigManager() {
-        if (!MAIN_FOLDER.exists()) {
-            MAIN_FOLDER.mkdirs();
-            firstLaunch = true;
-        }
-        if (!CONFIGS_FOLDER.exists()) CONFIGS_FOLDER.mkdirs();
-        if (!TEMP_FOLDER.exists()) TEMP_FOLDER.mkdirs();
-        if (!MISC_FOLDER.exists()) MISC_FOLDER.mkdirs();
-        if (!SOUNDS_FOLDER.exists()) SOUNDS_FOLDER.mkdirs();
+        firstLaunch = !MAIN_FOLDER.exists();
+        createDirs(MAIN_FOLDER, CONFIGS_FOLDER, TEMP_FOLDER, MISC_FOLDER, SOUNDS_FOLDER, IMAGES_FOLDER, TABPARSER_FOLDER, STASHLOGGER_FOLDER);
     }
 
-    public void loadSearch() {
-        try {
-            File file = new File(CONFIG_FOLDER_NAME + "/misc/search.txt");
-
-            if (file.exists())
-                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                    while (reader.ready())
-                        Search.defaultBlocks.add(SearchCommand.getRegisteredBlock(reader.readLine()));
-                }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void loadNuker() {
-        try {
-            File file = new File(CONFIG_FOLDER_NAME + "/misc/nuker.txt");
-
-            if (file.exists())
-                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                    while (reader.ready()) {
-                        Nuker.selectedBlocks.add(NukerCommand.getRegisteredBlock(reader.readLine()));
-                    }
-                }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void loadDefault(String name) {
-        ClientSettings.Language prevLang = ClientSettings.language.getValue();
-        Path path = Paths.get(CONFIG_FOLDER_NAME + "/configs/" + name + ".th");
-        try (InputStream in = this.getClass().getClassLoader().getResourceAsStream("cfg/" + name + ".th");
-             OutputStream out = Files.newOutputStream(path)) {
-            if (in == null) return;
-            IOUtils.copy(in, out);
-            load(name);
-            ClientSettings.language.setValue(prevLang);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void saveSearch() {
-        File file = new File(CONFIG_FOLDER_NAME + "/misc/search.txt");
-        try {
-            new File(CONFIG_FOLDER_NAME).mkdirs();
-            file.createNewFile();
-        } catch (Exception ignored) {
-        }
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            for (Block name : Search.defaultBlocks) {
-                writer.write(name.getTranslationKey() + "\n");
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void saveNuker() {
-        File file = new File(CONFIG_FOLDER_NAME + "/misc/nuker.txt");
-        try {
-            new File(CONFIG_FOLDER_NAME).mkdirs();
-            file.createNewFile();
-        } catch (Exception ignored) {
-        }
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            for (Block name : Nuker.selectedBlocks) {
-                writer.write(name.getTranslationKey() + "\n");
-            }
-        } catch (Exception ignored) {
-        }
+    private void createDirs(File... dirs) {
+        for (File dir : dirs) if (!dir.exists()) dir.mkdirs();
     }
 
     public static @NotNull String getConfigDate(String name) {
         File file = new File(CONFIGS_FOLDER, name + ".th");
-        if (!file.exists()) {
+        if (!file.exists())
             return "none";
+        return new SimpleDateFormat("dd MMM yyyy HH:mm").format(new Date(file.lastModified()));
+    }
+
+    public void load(String name, String category) {
+        File file = new File(CONFIGS_FOLDER, name + ".th");
+        if (!file.exists()) {
+            if (isRu()) Command.sendMessage("Конфига " + name + " не существует!");
+            else Command.sendMessage("Config " + name + " does not exist!");
+            return;
         }
-        long x = file.lastModified();
-        DateFormat obj = new SimpleDateFormat("dd MMM yyyy HH:mm");
-        Date sol = new Date(x);
-        return obj.format(sol);
+
+        if (currentConfig != null)
+            save(currentConfig);
+
+        ThunderHack.moduleManager.onUnload();
+        ThunderHack.moduleManager.onUnloadPost();
+        load(file, category);
+        ThunderHack.moduleManager.onLoad();
     }
 
     public void load(String name) {
@@ -178,50 +103,33 @@ public class ConfigManager implements IManager {
     public void loadModuleOnly(String name, Module module) {
         File file = new File(CONFIGS_FOLDER, name + ".th");
         if (!file.exists()) {
-            if (isRu()) Command.sendMessage("Конфига " + name + " не существует!");
-            else Command.sendMessage("Config " + name + " does not exist!");
-
+            Command.sendMessage(isRu() ? "Конфига " + name + " не существует!" : "Config " + name + " does not exist!");
             return;
         }
 
         ThunderHack.moduleManager.onUnload();
         ThunderHack.moduleManager.onUnloadPost();
-
         loadModuleOnly(file, module);
         ThunderHack.moduleManager.onLoad();
     }
 
     public void load(@NotNull File config) {
-        if (!config.exists()) save(config);
-        try {
-            FileReader reader = new FileReader(config, StandardCharsets.UTF_8);
-            JsonParser parser = new JsonParser();
+        load(config, "none");
+    }
 
-            JsonArray array = null;
-            try {
-                array = (JsonArray) parser.parse(reader);
-            } catch (ClassCastException e) {
-                save(config);
-            }
+    private void load(@NotNull File config, String category) {
+        if (!config.exists())
+            save(config);
 
-            JsonArray modules = null;
-            try {
-                JsonObject modulesObject = (JsonObject) array.get(0);
-                modules = modulesObject.getAsJsonArray("Modules");
-            } catch (Exception ignored) {
-            }
-            if (modules != null) {
-                modules.forEach(m -> {
-                    try {
-                        parseModule(m.getAsJsonObject());
-                    } catch (NullPointerException e) {
-                        System.err.println(e.getMessage());
-                    }
-                });
-            }
+        try (FileReader reader = new FileReader(config, StandardCharsets.UTF_8)) {
+            JsonObject modulesObject = JsonParser.parseReader(reader).getAsJsonArray().get(0).getAsJsonObject();
+            JsonArray modules = modulesObject.getAsJsonArray("Modules");
 
-            if (isRu()) Command.sendMessage("Загружен конфиг " + config.getName());
-            else Command.sendMessage("Loaded " + config.getName());
+            if (modules != null)
+                for (JsonElement element : modules)
+                    parseModule(element.getAsJsonObject(), category);
+
+            Command.sendMessage(isRu() ? "Загружен конфиг " + config.getName() : "Loaded " + config.getName());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -230,43 +138,21 @@ public class ConfigManager implements IManager {
     }
 
     public void loadModuleOnly(File config, Module module) {
-        try {
-            FileReader reader = new FileReader(config);
-            JsonParser parser = new JsonParser();
-
-            JsonArray array = null;
-            try {
-                array = (JsonArray) parser.parse(reader);
-            } catch (ClassCastException ignored) {
-            }
-
-            JsonArray modules = null;
-            try {
-                JsonObject modulesObject = (JsonObject) Objects.requireNonNull(array).get(0);
-                modules = modulesObject.getAsJsonArray("Modules");
-            } catch (Exception ignored) {
-            }
+        try (FileReader reader = new FileReader(config)) {
+            JsonArray array = JsonParser.parseReader(reader).getAsJsonArray();
+            JsonObject modulesObject = array.get(0).getAsJsonObject();
+            JsonArray modules = modulesObject.getAsJsonArray("Modules");
 
             if (modules != null) {
-                modules.forEach(m -> {
-                    Module module1 = ThunderHack.moduleManager.modules.stream()
-                            .filter(m1 -> m.getAsJsonObject().getAsJsonObject(m1.getName()) != null)
-                            .findFirst().orElse(null);
-
-                    if (module1 == null)
-                        return;
-
-                    if (Objects.equals(module.getName(), module1.getName())) {
-                        try {
-                            parseModule(m.getAsJsonObject());
-                        } catch (NullPointerException e) {
-                            System.err.println(e.getMessage());
-                        }
-                    }
-                });
+                for (JsonElement element : modules) {
+                    JsonObject moduleObject = element.getAsJsonObject();
+                    Module loadedModule = ThunderHack.moduleManager.modules.stream().filter(m -> moduleObject.getAsJsonObject(m.getName()) != null).findFirst().orElse(null);
+                    if (loadedModule != null && Objects.equals(module.getName(), loadedModule.getName()))
+                        parseModule(moduleObject, "none");
+                }
             }
-            if (isRu()) Command.sendMessage("Загружен модуль " + module.getName() + " с конфига " + config.getName());
-            else Command.sendMessage("Loaded " + module.getName() + " from " + config.getName());
+            Command.sendMessage(isRu() ? "Загружен модуль " + module.getName() + " с конфига " + config.getName() :
+                    "Loaded " + module.getName() + " from " + config.getName());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -285,9 +171,8 @@ public class ConfigManager implements IManager {
 
     public void save(@NotNull File config) {
         try {
-            if (!config.exists()) {
+            if (!config.exists())
                 config.createNewFile();
-            }
             JsonArray array = new JsonArray();
 
             JsonObject modulesObj = new JsonObject();
@@ -295,80 +180,64 @@ public class ConfigManager implements IManager {
             array.add(modulesObj);
 
             FileWriter writer = new FileWriter(config, StandardCharsets.UTF_8);
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-
-            gson.toJson(array, writer);
+            new GsonBuilder().setPrettyPrinting().create().toJson(array, writer);
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void parseModule(JsonObject object) throws NullPointerException {
+    private void parseModule(JsonObject object, String category) throws NullPointerException {
         Module module = ThunderHack.moduleManager.modules.stream()
                 .filter(m -> object.getAsJsonObject(m.getName()) != null)
                 .findFirst()
                 .orElse(null);
 
+        if (!Objects.equals(category, "none") && !module.getCategory().getName().toLowerCase().equals(category))
+            return;
+
         if (module != null) {
             JsonObject mobject = object.getAsJsonObject(module.getName());
 
-            for (Setting setting2 : module.getSettings()) {
+            for (Setting setting : module.getSettings()) {
                 try {
-                    switch (setting2.getType()) {
-                        case "Parent":
-                            continue;
-                        case "Boolean":
-                            setting2.setValue(mobject.getAsJsonPrimitive(setting2.getName()).getAsBoolean());
-                            continue;
-                        case "Double":
-                            setting2.setValue(mobject.getAsJsonPrimitive(setting2.getName()).getAsDouble());
-                            continue;
-                        case "Float":
-                            setting2.setValue(mobject.getAsJsonPrimitive(setting2.getName()).getAsFloat());
-                            continue;
-                        case "Integer":
-                            setting2.setValue(mobject.getAsJsonPrimitive(setting2.getName()).getAsInt());
-                            continue;
-                        case "String":
-                            setting2.setValue(mobject.getAsJsonPrimitive(setting2.getName()).getAsString().replace("_", " "));
-                            continue;
-                        case "Bind":
-                            try {
-                                JsonArray bindArray = mobject.getAsJsonArray(setting2.getName());
-                                if (bindArray.get(0).getAsString().contains("M")) {
-                                    setting2.setValue(new Bind(Integer.parseInt(bindArray.get(0).getAsString().replace("M", "")), true, bindArray.get(1).getAsBoolean()));
-                                } else {
-                                    setting2.setValue(new Bind(Integer.parseInt(bindArray.get(0).getAsString()), false, bindArray.get(1).getAsBoolean()));
-                                }
-                            } catch (Exception ignored) {
-                            }
-                            continue;
-                        case "ColorSetting":
-                            JsonArray array = mobject.getAsJsonArray(setting2.getName());
-                            ((ColorSetting) setting2.getValue()).setColor(array.get(0).getAsInt());
-                            ((ColorSetting) setting2.getValue()).setRainbow(array.get(1).getAsBoolean());
-                            ((ColorSetting) setting2.getValue()).setGlobalOffset(array.get(2).getAsInt());
-                            continue;
-                        case "PositionSetting":
-                            JsonArray array3 = mobject.getAsJsonArray(setting2.getName());
-                            ((PositionSetting) setting2.getValue()).setX(array3.get(0).getAsFloat());
-                            ((PositionSetting) setting2.getValue()).setY(array3.get(1).getAsFloat());
-                            continue;
-                        case "BooleanParent":
-                            ((BooleanParent) setting2.getValue()).setEnabled(mobject.getAsJsonPrimitive(setting2.getName()).getAsBoolean());
-                            continue;
-                        case "Enum":
-                            try {
-                                EnumConverter converter = new EnumConverter(((Enum) setting2.getValue()).getClass());
-                                Enum value = converter.doBackward(mobject.getAsJsonPrimitive(setting2.getName()));
-                                setting2.setValue((value == null) ? setting2.getDefaultValue() : value);
-                            } catch (Exception ignored) {
-                            }
+                    if (setting.getValue() instanceof SettingGroup) {
+
+                    } else if (setting.getValue() instanceof Boolean) {
+                        setting.setValue(mobject.getAsJsonPrimitive(setting.getName()).getAsBoolean());
+                    } else if (setting.getValue() instanceof Float) {
+                        setting.setValue(mobject.getAsJsonPrimitive(setting.getName()).getAsFloat());
+                    } else if (setting.getValue() instanceof Integer) {
+                        setting.setValue(mobject.getAsJsonPrimitive(setting.getName()).getAsInt());
+                    } else if (setting.getValue() instanceof String) {
+                        setting.setValue(mobject.getAsJsonPrimitive(setting.getName()).getAsString().replace("%%", " ").replace("++", "/"));
+                    } else if (setting.getValue() instanceof Bind) {
+                        JsonArray array = mobject.getAsJsonArray(setting.getName());
+                        if (array.get(0).getAsString().contains("M")) {
+                            setting.setValue(new Bind(Integer.parseInt(array.get(0).getAsString().replace("M", "")), true, array.get(1).getAsBoolean()));
+                        } else {
+                            setting.setValue(new Bind(Integer.parseInt(array.get(0).getAsString()), false, array.get(1).getAsBoolean()));
+                        }
+                    } else if (setting.getValue() instanceof ColorSetting colorSetting) {
+                        JsonArray array = mobject.getAsJsonArray(setting.getName());
+                        colorSetting.setColor(array.get(0).getAsInt());
+                        colorSetting.setRainbow(array.get(1).getAsBoolean());
+                        colorSetting.setGlobalOffset(array.get(2).getAsInt());
+                    } else if (setting.getValue() instanceof PositionSetting posSetting) {
+                        JsonArray array = mobject.getAsJsonArray(setting.getName());
+                        posSetting.setX(array.get(0).getAsFloat());
+                        posSetting.setY(array.get(1).getAsFloat());
+                    } else if (setting.getValue() instanceof BooleanSettingGroup bGroup) {
+                        bGroup.setEnabled(mobject.getAsJsonPrimitive(setting.getName()).getAsBoolean());
+                    } else if (setting.getValue() instanceof ItemSelectSetting iSetting) {
+                        JsonArray array = mobject.getAsJsonArray(setting.getName());
+                        for (int i = 0; i < array.size(); i++)
+                            iSetting.getItemsById().add(array.get(i).getAsString());
+                    } else if (setting.getValue().getClass().isEnum()) {
+                        Enum value = new EnumConverter(((Enum) setting.getValue()).getClass()).doBackward(mobject.getAsJsonPrimitive(setting.getName()));
+                        setting.setValue((value == null) ? setting.getDefaultValue() : value);
                     }
                 } catch (Exception e) {
-                    System.out.println(module.getName());
-                    System.out.println(setting2);
                     e.printStackTrace();
                 }
             }
@@ -388,53 +257,44 @@ public class ConfigManager implements IManager {
         JsonParser jp = new JsonParser();
 
         for (Setting setting : m.getSettings()) {
-            if (setting.isColorSetting()) {
+            if (setting.getValue() instanceof ColorSetting color) {
                 JsonArray array = new JsonArray();
-                array.add(new JsonPrimitive(((ColorSetting) setting.getValue()).getRawColor()));
-                array.add(new JsonPrimitive(((ColorSetting) setting.getValue()).isRainbow()));
-                array.add(new JsonPrimitive(((ColorSetting) setting.getValue()).getGlobalOffset()));
+                array.add(new JsonPrimitive(color.getRawColor()));
+                array.add(new JsonPrimitive(color.isRainbow()));
+                array.add(new JsonPrimitive(color.getGlobalOffset()));
                 attribs.add(setting.getName(), array);
-                continue;
-            }
-            if (setting.isPositionSetting()) {
+            } else if (setting.getValue() instanceof PositionSetting pos) {
                 JsonArray array = new JsonArray();
-                float num2 = ((PositionSetting) setting.getValue()).getX();
-                float num1 = ((PositionSetting) setting.getValue()).getY();
-                array.add(new JsonPrimitive(num2));
-                array.add(new JsonPrimitive(num1));
-
+                array.add(new JsonPrimitive(pos.getX()));
+                array.add(new JsonPrimitive(pos.getY()));
                 attribs.add(setting.getName(), array);
-                continue;
-            }
-            if (setting.isBooleanParent()) {
-                attribs.add(setting.getName(), jp.parse(String.valueOf(((BooleanParent) setting.getValue()).isEnabled())));
-                continue;
-            }
-            if (setting.isBindSetting()) {
-                Bind b = (Bind) setting.getValue();
+            } else if (setting.getValue() instanceof BooleanSettingGroup bGroup) {
+                attribs.add(setting.getName(), jp.parse(String.valueOf(bGroup.isEnabled())));
+            } else if (setting.getValue() instanceof Bind b) {
                 JsonArray array = new JsonArray();
-                boolean hold = ((Bind) setting.getValue()).isHold();
                 if (b.isMouse())
                     array.add(jp.parse(b.getBind()));
                 else
                     array.add(new JsonPrimitive(b.getKey()));
-                array.add(new JsonPrimitive(hold));
+                array.add(new JsonPrimitive(b.isHold()));
                 attribs.add(setting.getName(), array);
-                continue;
-            }
-            if (setting.isStringSetting()) {
-                String str = (String) setting.getValue();
-                attribs.add(setting.getName(), jp.parse(str.replace(" ", "_")));
-                continue;
-            }
-            if (setting.isEnumSetting()) {
-                EnumConverter converter = new EnumConverter(((Enum) setting.getValue()).getClass());
-                attribs.add(setting.getName(), converter.doForward((Enum) setting.getValue()));
-                continue;
-            }
-            try {
-                attribs.add(setting.getName(), jp.parse(setting.getValueAsString()));
-            } catch (Exception ignored) {
+            } else if (setting.getValue() instanceof String str) {
+                try {
+                    attribs.add(setting.getName(), jp.parse(str.replace(" ", "%%").replace("/", "++")));
+                } catch (Exception exception) {
+                }
+            } else if (setting.getValue() instanceof ItemSelectSetting iSelect) {
+                JsonArray array = new JsonArray();
+                for (String id : iSelect.getItemsById())
+                    array.add(new JsonPrimitive(id));
+                attribs.add(setting.getName(), array);
+            } else if (setting.isEnumSetting()) {
+                attribs.add(setting.getName(), new EnumConverter(((Enum) setting.getValue()).getClass()).doForward((Enum) setting.getValue()));
+            } else {
+                try {
+                    attribs.add(setting.getName(), jp.parse(setting.getValue().toString()));
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -443,16 +303,16 @@ public class ConfigManager implements IManager {
         return moduleObject;
     }
 
-    public boolean delete(@NotNull File file) {
-        return file.delete();
+    public void delete(@NotNull File file) {
+        file.delete();
     }
 
-    public boolean delete(String name) {
+    public void delete(String name) {
         File file = new File(CONFIGS_FOLDER, name + ".th");
         if (!file.exists()) {
-            return false;
+            return;
         }
-        return delete(file);
+        delete(file);
     }
 
     public List<String> getConfigList() {
@@ -514,165 +374,5 @@ public class ConfigManager implements IManager {
         }
         currentConfig = new File(CONFIGS_FOLDER, name + ".th");
         return currentConfig;
-    }
-
-    public void loadChestStealer() {
-        try {
-            File file = new File(CONFIG_FOLDER_NAME + "/misc/search.txt");
-
-            if (file.exists()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                    while (reader.ready()) {
-                        ModuleManager.chestStealer.items.add(reader.readLine());
-                    }
-
-                }
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void saveChestStealer() {
-        File file = new File(CONFIG_FOLDER_NAME + "/misc/search.txt");
-        try {
-            file.createNewFile();
-        } catch (Exception ignored) {
-        }
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            for (String item : ModuleManager.chestStealer.items) {
-                writer.write(item + "\n");
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void loadInvCleaner() {
-        try {
-            File file = new File("ThunderHackRecode/misc/invcleaner.txt");
-
-            if (file.exists()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                    while (reader.ready()) {
-                        ModuleManager.inventoryCleaner.items.add(reader.readLine());
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void saveInvCleaner() {
-        File file = new File("ThunderHackRecode/misc/invcleaner.txt");
-        try {
-            file.createNewFile();
-        } catch (Exception ignored) {
-
-        }
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            for (String item : ModuleManager.inventoryCleaner.items) {
-                writer.write(item + "\n");
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void loadAutoBuy() {
-        try {
-            File file = new File(ConfigManager.CONFIG_FOLDER_NAME + "/misc/autobuy.txt");
-
-            if (file.exists()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(file, StandardCharsets.UTF_8))) {
-                    while (reader.ready()) {
-                        String[] nameKey = reader.readLine().split(";");
-                        String name = nameKey[0];
-                        String price = nameKey[1];
-                        String count = nameKey[2];
-                        String enchantments = nameKey[3];
-                        String attributes = nameKey[4];
-                        String checkForStar = nameKey[5];
-
-                        ArrayList<Pair<String, Integer>> enchList = new ArrayList<>();
-                        for (String enc : enchantments.split(" ")) {
-                            Pair<String, Integer> ench = AutoBuy.parseEnchant(enc);
-                            if (ench != null)
-                                enchList.add(ench);
-                        }
-
-                        ArrayList<String> attribList = new ArrayList<>();
-                        for (String attr : attributes.split(",")) {
-                            if (!attr.isEmpty())
-                                attribList.add(attr);
-                        }
-
-                        AutoBuy.items.add(new AutoBuyItem(InventoryUtility.getItem(name), enchList, attribList, Integer.parseInt(price), Integer.parseInt(count), Boolean.parseBoolean(checkForStar)));
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void saveAutoBuy() {
-        File file = new File(ConfigManager.CONFIG_FOLDER_NAME + "/misc/autobuy.txt");
-        try {
-            if (new File(ConfigManager.CONFIG_FOLDER_NAME).mkdirs()) {
-                file.createNewFile();
-            }
-        } catch (Exception ignored) {
-        }
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, StandardCharsets.UTF_8))) {
-            for (AutoBuyItem item : AutoBuy.items) {
-                writer.write(item.getItem().getTranslationKey().replace("block.minecraft.", "").replace("item.minecraft.", "") + ";" + item.getPrice() + ";" + item.getCount() + ";" + ArrayToString(item.getEnchantmentsToArray()) + ";" + ArrayToStringСomma(item.getAttributesToArray()) + ";" + item.checkForStar() + "\n");
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public List<String> getAutoBuyList() {
-        if (!MAIN_FOLDER.exists() || MAIN_FOLDER.listFiles() == null) return null;
-
-        List<String> list = new ArrayList<>();
-
-        if (AUTOBUY_FOLDER.listFiles() != null) {
-            for (File file : Arrays.stream(Objects.requireNonNull(AUTOBUY_FOLDER.listFiles())).filter(f -> f.getName().endsWith(".txt")).collect(Collectors.toList())) {
-                list.add(file.getName().replace(".txt", ""));
-            }
-        }
-        return list;
-    }
-
-    public static String ArrayToString(Object[] a) {
-        if (a == null)
-            return "null";
-        int iMax = a.length - 1;
-        if (iMax == -1)
-            return "";
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; ; i++) {
-            b.append(String.valueOf(a[i]));
-            if (i == iMax)
-                return b.toString();
-            b.append(" ");
-        }
-    }
-
-    public static String ArrayToStringСomma(Object[] a) {
-        if (a == null)
-            return "null";
-        int iMax = a.length - 1;
-        if (iMax == -1)
-            return "";
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; ; i++) {
-            b.append(String.valueOf(a[i]));
-            if (i == iMax)
-                return b.toString();
-            b.append(",");
-        }
     }
 }

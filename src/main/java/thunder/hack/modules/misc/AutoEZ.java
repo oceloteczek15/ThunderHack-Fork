@@ -2,7 +2,7 @@ package thunder.hack.modules.misc;
 
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
-import thunder.hack.events.impl.DeathEvent;
+import thunder.hack.events.impl.EventDeath;
 import thunder.hack.events.impl.PacketEvent;
 import thunder.hack.modules.Module;
 import thunder.hack.modules.combat.Aura;
@@ -23,7 +23,6 @@ public final class AutoEZ extends Module {
     public Setting<Boolean> global = new Setting<>("global", true);
 
     String[] EZ = new String[]{
-            "%player% ПОЗОРИЩЕЕЕЕЕ ДАЖЕ БОТИХА НА ХЕЛЛРАЙДЕРЕ ВГЕТАЛА БАФЫ",
             "%player% АНБРЕЙН ГЕТАЙ ТХ РЕКОД",
             "%player% ТВОЯ МАТЬ БУДЕТ СЛЕДУЮЩЕЙ))))",
             "%player% БИЧАРА БЕЗ ТХ",
@@ -40,12 +39,9 @@ public final class AutoEZ extends Module {
     private final Setting<ModeEn> mode = new Setting<>("Mode", ModeEn.Basic);
     private final Setting<ServerMode> server = new Setting<>("Server", ServerMode.Universal);
 
-    private static AutoEZ instance;
-
     public AutoEZ() {
         super("AutoEZ", Category.MISC);
         loadEZ();
-        instance = this;
     }
 
     public static void loadEZ() {
@@ -92,10 +88,6 @@ public final class AutoEZ extends Module {
         }
     }
 
-    public static AutoEZ getInstance() {
-        return instance;
-    }
-
     @Override
     public void onEnable() {
         loadEZ();
@@ -130,7 +122,7 @@ public final class AutoEZ extends Module {
     }
 
     @EventHandler
-    public void onDeath(DeathEvent e) {
+    public void onDeath(EventDeath e) {
         if (server.getValue() != ServerMode.Universal) return;
         if (Aura.target != null && Aura.target == e.getPlayer()) {
             sayEZ(e.getPlayer().getName().getString());

@@ -27,11 +27,9 @@ public final class RPC extends Module {
     public static boolean started;
     static String String1 = "none";
     private static Thread thread;
-    private static RPC instance;
 
     public RPC() {
         super("DiscordRPC", Category.CLIENT);
-        instance = this;
     }
 
     public static void readFile() {
@@ -81,7 +79,7 @@ public final class RPC extends Module {
             DiscordEventHandlers handlers = new DiscordEventHandlers();
             rpc.Discord_Initialize("1093053626198523935", handlers, true, "");
             presence.startTimestamp = (System.currentTimeMillis() / 1000L);
-            presence.largeImageText = "v" + ThunderHack.VERSION + " by " + ThunderUtility.getAuthors();
+            presence.largeImageText = "v" + ThunderHack.VERSION + " [" + ThunderHack.GITH_HASH + "]";
             rpc.Discord_UpdatePresence(presence);
 
             thread = new Thread(() -> {
@@ -94,7 +92,7 @@ public final class RPC extends Module {
                         case Stats ->
                                 presence.state = "Hacks: " + ThunderHack.moduleManager.getEnabledModules().size() + " / " + ThunderHack.moduleManager.modules.size();
                         case Custom -> presence.state = state.getValue();
-                        case Version -> presence.state = "v1.4 for mc 1.20.4";
+                        case Version -> presence.state = "v" + ThunderHack.VERSION +" for mc 1.20.6";
                     }
 
                     if (nickname.getValue()) {
@@ -106,7 +104,7 @@ public final class RPC extends Module {
                     }
 
                     presence.button_label_1 = "Download";
-                    presence.button_url_1 = "https://thunderhack.onrender.com/";
+                    presence.button_url_1 = "https://github.com/Pan4ur/ThunderHack-Recode/";
 
                     switch (mode.getValue()) {
                         case Recode -> presence.largeImageKey = "https://i.imgur.com/yY0z2Uq.gif";
@@ -140,39 +138,13 @@ public final class RPC extends Module {
             result = isRu() ? "Выбирает сервер" : "Picks a server";
         } else if (mc.getCurrentServerEntry() != null) {
             result = isRu() ? (showIP.getValue() ? "Играет на " + mc.getCurrentServerEntry().address : "Играет на сервере") : (showIP.getValue() ? "Playing on " + mc.getCurrentServerEntry().address : "Playing on server");
-            if (mc.getCurrentServerEntry().address.equals("ngrief.me"))
-                result = mc.getCurrentServerEntry().address + " " + getNexusDetails();
         } else if (mc.isInSingleplayer()) {
             result = isRu() ? "Читерит в одиночке" : "SinglePlayer hacker";
         }
         return result;
     }
 
-    private String getNexusDetails() {
-        if (isOn(-150, -3, -146, 1))
-            return "(фармит на плите)";
-        else if (isOn(-120, 10, -82, 46))
-            return "(у прудика)";
-        else if (isOn(-92, -74, -26, -64))
-            return "(на warp pvp)";
-        else if (isOn(0, -27, 20, -10))
-            return "(у аукциона)";
-        else if (isOn(-210, -160, -126, 131))
-            return "(на warp exit)";
-        else if (isOn(-124, -92, 42, 85))
-            return "(на спавне)";
-        else return "(на ртп)";
-    }
-
-    private boolean isOn(int x, int z, int x1, int z1) {
-        return mc.player.getX() > x && mc.player.getX() < x1 && mc.player.getZ() > z && mc.player.getZ() < z1;
-    }
-
     public enum Mode {Custom, MegaCute, Recode}
 
     public enum sMode {Custom, Stats, Version}
-
-    public static RPC getInstance() {
-        return instance;
-    }
 }

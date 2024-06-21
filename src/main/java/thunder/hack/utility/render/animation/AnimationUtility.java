@@ -5,7 +5,7 @@ import thunder.hack.utility.math.MathUtility;
 
 public class AnimationUtility {
     public static double deltaTime() {
-        return FrameRateCounter.INSTANCE.getFps() > 0 ? (1.0000 / FrameRateCounter.INSTANCE.getFps()) : 1;
+        return FrameRateCounter.INSTANCE.getFps() > 5 ? (1f / FrameRateCounter.INSTANCE.getFps()) : 0.016;
     }
 
     public static float fast(float end, float start, float multiple) {

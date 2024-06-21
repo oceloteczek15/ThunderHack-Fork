@@ -22,6 +22,7 @@ import thunder.hack.events.impl.EventHeldItemRenderer;
 import thunder.hack.events.impl.PacketEvent;
 import thunder.hack.injection.accesors.IHeldItemRenderer;
 import thunder.hack.modules.Module;
+import thunder.hack.modules.combat.Aura;
 import thunder.hack.setting.Setting;
 
 public class Animations extends Module {
@@ -29,6 +30,7 @@ public class Animations extends Module {
         super("Animations", Category.RENDER);
     }
 
+    private final Setting<Boolean> onlyaura = new Setting<>("OnlyAura",false);
     public Setting<Boolean> oldAnimationsM = new Setting<>("DisableSwapMain", true);
     public Setting<Boolean> oldAnimationsOff = new Setting<>("DisableSwapOff", true);
     private final Setting<Mode> mode = new Setting<Mode>("Mode", Mode.Default);
@@ -38,9 +40,12 @@ public class Animations extends Module {
     public boolean flip;
 
     private enum Mode {
-        Default, One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Eleven, Twelve, Thirteen
+        Default, One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Eleven, Twelve, Thirteen, Fourteen
     }
 
+    public boolean shouldAnimate(){
+        return isEnabled() && (!onlyaura.getValue() || ModuleManager.aura.isEnabled() && Aura.target != null);
+    }
 
     @Override
     public void onUpdate() {
@@ -70,6 +75,7 @@ public class Animations extends Module {
             matrices.translate(ModuleManager.viewModel.positionMainX.getValue(), -ModuleManager.viewModel.positionMainY.getValue(), -ModuleManager.viewModel.positionMainZ.getValue());
             return;
         }
+
 
         switch (mode.getValue()) {
             case Default -> {
@@ -180,6 +186,25 @@ public class Animations extends Module {
                 matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-MathHelper.sin(swingProgress * 3f) * 60f));
                 matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-60f * g));
                 translateBack(matrices);
+            }
+            case Fourteen ->{
+                if(swingProgress > 0) {
+                    float g = MathHelper.sin(MathHelper.sqrt(swingProgress) *  (float) Math.PI);
+                    matrices.translate(0.56F, equipProgress * -0.2f - 0.5F, -0.7F);
+                    translateToViewModel(matrices);
+                    matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(45));
+                    matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(g * -85.0F));
+                    matrices.translate(-0.1F, 0.28F, 0.2F);
+                    matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-85.0F));
+                    translateBack(matrices);
+                } else {
+                    float n = -0.4f * MathHelper.sin(MathHelper.sqrt(swingProgress) * (float) Math.PI);
+                    float m = 0.2f * MathHelper.sin(MathHelper.sqrt(swingProgress) * ((float) Math.PI * 2));
+                    float f1 = -0.2f * MathHelper.sin(swingProgress * (float) Math.PI);
+                    matrices.translate(n, m, f1);
+                    applyEquipOffset(matrices, arm, equipProgress);
+                    applySwingOffset(matrices, arm, swingProgress);
+                }
             }
         }
     }
@@ -302,7 +327,7 @@ public class Animations extends Module {
                     matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees((float) l * 65.0F));
                     matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((float) l * -85.0F));
                 } else {
-                    renderSwordAnimation(matrices, f, swingProgress, equipProgress, arm);
+                     renderSwordAnimation(matrices, f, swingProgress, equipProgress, arm);
                 }
                 EventHeldItemRenderer event = new EventHeldItemRenderer(hand, item, equipProgress, matrices);
                 ThunderHack.EVENT_BUS.post(event);

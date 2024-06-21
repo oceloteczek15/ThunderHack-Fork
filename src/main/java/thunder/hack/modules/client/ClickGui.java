@@ -1,70 +1,36 @@
 package thunder.hack.modules.client;
 
 import meteordevelopment.orbit.EventHandler;
-import thunder.hack.core.impl.ModuleManager;
-import thunder.hack.events.impl.SettingEvent;
-import thunder.hack.gui.clickui.normal.ClickUI;
-import thunder.hack.gui.clickui.small.SmallClickUI;
+import net.minecraft.util.Identifier;
+import thunder.hack.events.impl.EventSetting;
+import thunder.hack.gui.clickui.ClickGUI;
+import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.modules.Module;
-import thunder.hack.setting.impl.ColorSetting;
 import thunder.hack.setting.Setting;
-import thunder.hack.utility.render.Render2DEngine;
-
-import java.awt.*;
+import thunder.hack.setting.impl.BooleanSettingGroup;
 
 public class ClickGui extends Module {
-    public Setting<Mode> mode = new Setting<>("Mode", Mode.Default);
-    public Setting<TextSide> textSide = new Setting<>("TextSide", TextSide.Left);
-    public Setting<scrollModeEn> scrollMode = new Setting<>("ScrollMode", scrollModeEn.Old);
-    public Setting<Integer> catHeight = new Setting<>("CategoryHeight", 300, 100, 720);
-
-    public final Setting<colorModeEn> colorMode = new Setting<>("ColorMode", colorModeEn.Static);
-    public final Setting<ColorSetting> mainColor = new Setting<>("Main", new ColorSetting(-6974059));
-    public final Setting<ColorSetting> secondaryColor = new Setting<>("Secondary", new ColorSetting(-8365735));
-    public final Setting<ColorSetting> plateColor = new Setting<>("Plate", new ColorSetting(-14474718));
-    public final Setting<ColorSetting> disabled = new Setting<>("Disabled", new ColorSetting(new Color(24, 24, 27)));
-    public final Setting<ColorSetting> catColor = new Setting<>("Category", new ColorSetting(-15395563));
-
-    public final Setting<ColorSetting> disabledText = new Setting<>("DisabledText", new ColorSetting(-1));
-    public final Setting<ColorSetting> enabledText = new Setting<>("EnabledText", new ColorSetting(-1));
-    public final Setting<ColorSetting> categoryText = new Setting<>("CategoryText", new ColorSetting(-1));
-
-    public final Setting<Integer> colorSpeed = new Setting<>("ColorSpeed", 18, 2, 54);
-    public final Setting<Boolean> showBinds = new Setting<>("ShowBinds", true);
-    public final Setting<Boolean> outline = new Setting<>("Outline", false);
+    public final Setting<Gradient> gradientMode = new Setting<>("Gradient", Gradient.LeftToRight);
+    public final Setting<TextSide> textSide = new Setting<>("TextSide", TextSide.Left);
+    public final Setting<scrollModeEn> scrollMode = new Setting<>("ScrollMode", scrollModeEn.Old);
+    public final Setting<Integer> catHeight = new Setting<>("CategoryHeight", 300, 100, 720, v -> scrollMode.is(scrollModeEn.New));
     public final Setting<Boolean> descriptions = new Setting<>("Descriptions", true);
-    public final Setting<Boolean> msaa = new Setting<>("MSAA", true);
+    public final Setting<Boolean> blur = new Setting<>("Blur", true);
+    public final Setting<Boolean> tips = new Setting<>("Tips", true);
+    public final Setting<Image> image = new Setting<>("Image", Image.None);
+    public final Setting<Integer> moduleWidth = new Setting<>("ModuleWidth", 100, 50, 200);
+    public final Setting<Integer> moduleHeight = new Setting<>("ModuleHeight", 14, 8, 25);
+    public final Setting<Integer> settingFontScale = new Setting<>("SettingFontScale", 12, 6, 24);
+    public final Setting<Integer> modulesFontScale = new Setting<>("ModulesFontScale", 14, 6, 24);
+    public static final Setting<BooleanSettingGroup> gear = new Setting<>("Gear", new BooleanSettingGroup(true));
+    public final Setting<Integer> gearScale = new Setting<>("GearScale", 60, 6, 300).addToGroup(gear);
+    public static Setting<Float> gearDuration = new Setting<>("GearDuration", 0.5f, 0.1f, 2f).addToGroup(gear);
+    public static Setting<Integer> gearStop = new Setting<>("GearStop", 25, 10, 45).addToGroup(gear);
 
-/*
-    я хотел, а потом опять забил
-    private final Setting<PositionSetting> combatCat = new Setting<>("combatCat", new PositionSetting(0.5f, 0.5f));
-    private final Setting<PositionSetting> miscCat = new Setting<>("miscCat", new PositionSetting(0.5f, 0.5f));
-    private final Setting<PositionSetting> renderCat = new Setting<>("renderCat", new PositionSetting(0.5f, 0.5f));
-    private final Setting<PositionSetting> movementCat = new Setting<>("movementCat", new PositionSetting(0.5f, 0.5f));
-    private final Setting<PositionSetting> playerCat = new Setting<>("playerCat", new PositionSetting(0.5f, 0.5f));
-    private final Setting<PositionSetting> clientCat = new Setting<>("clientCat", new PositionSetting(0.5f, 0.5f));
-    private final Setting<PositionSetting> hudCat = new Setting<>("hudCat", new PositionSetting(0.5f, 0.5f));
- */
+    public final Setting<Boolean> closeAnimation = new Setting<>("CloseAnimation", true);
 
     public ClickGui() {
         super("ClickGui", Module.Category.CLIENT);
-    }
-
-    public static ClickGui getInstance() {
-        return ModuleManager.clickGui;
-    }
-
-
-    public Color getColor(int count) {
-        return switch (colorMode.getValue()) {
-            case Sky -> Render2DEngine.skyRainbow(colorSpeed.getValue(), count);
-            case LightRainbow -> Render2DEngine.rainbow(colorSpeed.getValue(), count, .6f, 1, 1);
-            case Rainbow -> Render2DEngine.rainbow(colorSpeed.getValue(), count, 1f, 1, 1);
-            case Fade -> Render2DEngine.fade(colorSpeed.getValue(), count, mainColor.getValue().getColorObject(), 1);
-            case DoubleColor -> Render2DEngine.TwoColoreffect(mainColor.getValue().getColorObject(), secondaryColor.getValue().getColorObject(), colorSpeed.getValue(), count);
-            case Analogous -> Render2DEngine.interpolateColorsBackAndForth(colorSpeed.getValue(), count, mainColor.getValue().getColorObject(), Render2DEngine.getAnalogousColor(secondaryColor.getValue().getColorObject()), true);
-            default -> mainColor.getValue().getColorObject();
-        };
     }
 
     @Override
@@ -73,24 +39,25 @@ public class ClickGui extends Module {
     }
 
     public void setGui() {
-        if(mode.getValue() == Mode.Default) mc.setScreen(ClickUI.getClickGui());
-        else mc.setScreen(SmallClickUI.getClickGui());
-    }
-
-    @EventHandler
-    public void onSettingChange(SettingEvent e) {
-        if(e.getSetting() == mode) {
-             setGui();
-        }
-    }
-
-    public int getTextColor(Module m) {
-        return m == null || m.isEnabled() ? enabledText.getValue().getColor() : disabledText.getValue().getColor();
+        mc.setScreen(ClickGUI.getClickGui());
     }
 
     @Override
     public void onUpdate() {
-        if (!(ClickGui.mc.currentScreen instanceof ClickUI) && !(ClickGui.mc.currentScreen instanceof SmallClickUI)) disable();
+        if (!(ClickGui.mc.currentScreen instanceof ClickGUI))
+            disable();
+    }
+
+    @EventHandler
+    public void onSetting(EventSetting e) {
+        try {
+            if (e.getSetting() == settingFontScale)
+                FontRenderers.sf_medium_mini = FontRenderers.create(settingFontScale.getValue(), "sf_medium");
+
+            if (e.getSetting() == modulesFontScale)
+                FontRenderers.sf_medium_modules = FontRenderers.create(modulesFontScale.getValue(), "sf_medium");
+        } catch (Exception ignored) {
+        }
     }
 
     public enum colorModeEn {
@@ -108,14 +75,42 @@ public class ClickGui extends Module {
         Old
     }
 
-    public enum Mode {
-        Default,
-        Small
-    }
-
     public enum TextSide {
         Left,
         Center
+    }
+
+    public enum Gradient {
+        UpsideDown,
+        LeftToRight,
+        both
+    }
+
+    public enum Image {
+        None("", 0, 0, new int[]{0, 0}, 0),
+        Bdsm("bdsm.png", 1414, 823, new int[]{-100, 90}, 900),
+        Cutie("cutie.png", 476, 490, new int[]{500, 60}, 500),
+        Cutie2("cutie2.png", 540, 540, new int[]{500, 60}, 500),
+        Nya("nya.png", 746, 720, new int[]{500, 60}, 500),
+        Smile("smile.png", 324, 406, new int[]{500, 40}, 500),
+        Bat("bat.png", 352, 503, new int[]{500, 40}, 500),
+        Gacha("gacha.png", 592, 592, new int[]{500, 60}, 500),
+        NFT("nft.png", 562, 494, new int[]{400, 110}, 500),
+        ThousandSeven("thousand_seven.png", 380, 336, new int[]{400, 130}, 500);
+
+        public final int fileWidth;
+        public final int fileHeight;
+        public final Identifier file;
+        public final int[] pos;
+        public final int size;
+
+        Image(String file, int fileWidth, int fileHeight, int[] pos, int size) {
+            this.fileHeight = fileHeight;
+            this.fileWidth = fileWidth;
+            this.file = new Identifier("thunderhack", "textures/gui/images/" + file);
+            this.pos = pos;
+            this.size = size;
+        }
     }
 }
 

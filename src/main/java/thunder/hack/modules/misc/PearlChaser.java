@@ -24,11 +24,10 @@ import thunder.hack.events.impl.EventPostSync;
 import thunder.hack.events.impl.EventSync;
 import thunder.hack.modules.Module;
 import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.BooleanParent;
+import thunder.hack.setting.impl.BooleanSettingGroup;
 import thunder.hack.utility.Timer;
 import thunder.hack.utility.math.MathUtility;
 import thunder.hack.utility.player.MovementUtility;
-import thunder.hack.utility.player.PlayerUtility;
 
 import java.util.Comparator;
 
@@ -42,8 +41,8 @@ public class PearlChaser extends Module {
         super("PearlChaser", Category.MISC);
     }
 
-    private final Setting<BooleanParent> stopMotion = new Setting<>("StopMotion", new BooleanParent(false));
-    private final Setting<Boolean> legitStop = new Setting<>("LegitStop", false).withParent(stopMotion);
+    private final Setting<BooleanSettingGroup> stopMotion = new Setting<>("StopMotion", new BooleanSettingGroup(false));
+    private final Setting<Boolean> legitStop = new Setting<>("LegitStop", false).addToGroup(stopMotion);
     private final Setting<Boolean> pauseAura = new Setting<>("PauseAura", false);
     private final Setting<Boolean> onlyOnGround = new Setting<>("OnlyOnGround", false);
     private final Setting<Boolean> noMove = new Setting<>("NoMove", false);
@@ -69,7 +68,6 @@ public class PearlChaser extends Module {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onSync(EventSync event) {
-
         // Анти селфкилл
         if (mc.player.getHealth() < 5)
             return;
@@ -140,7 +138,7 @@ public class PearlChaser extends Module {
             if (epSlot != -1) {
                 mc.player.getInventory().selectedSlot = epSlot;
                 sendPacket(new UpdateSelectedSlotC2SPacket(epSlot));
-                sendPacket(new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, PlayerUtility.getWorldActionId(mc.world)));
+                sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, id));
                 sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
                 mc.player.getInventory().selectedSlot = originalSlot;
                 sendPacket(new UpdateSelectedSlotC2SPacket(originalSlot));

@@ -11,9 +11,16 @@ public class HotbarReplenish extends Module {
         super("HotbarReplenish", Category.PLAYER);
     }
 
+    private final Setting<Mode> mode = new Setting<>("Mode", Mode.SWAP);
     private final Setting<Integer> delay = new Setting<>("Delay", 2, 0, 10);
-    private final Setting<Integer> refillThr = new Setting<>("Threshold", 16, 5, 32);
+    private final Setting<Integer> refillThr = new Setting<>("Threshold", 16, 1, 63);
+    private final Setting<Integer> refillSmallThr = new Setting<>("PearlsThreshold", 4, 1, 15);
+
     private final Timer timer = new Timer();
+
+    private enum Mode {
+        QUICK_MOVE, SWAP
+    }
 
     @Override
     public void onUpdate() {
@@ -28,15 +35,19 @@ public class HotbarReplenish extends Module {
 
     private boolean need(int slot) {
         ItemStack stack = mc.player.getInventory().getStack(slot);
+        if (stack.isEmpty() || !stack.isStackable()) return false;
 
-        if (stack.isEmpty()) return false;
-        if (!stack.isStackable()) return false;
-        if (stack.getCount() >= refillThr.getValue()) return false;
+        if (stack.getMaxCount() == 16 && stack.getCount() > refillSmallThr.getValue()) return false;
+
+        if (stack.getMaxCount() == 64 && stack.getCount() > refillThr.getValue()) return false;
 
         for (int i = 9; i < 36; ++i) {
             ItemStack item = mc.player.getInventory().getStack(i);
             if (item.isEmpty() || !canMerge(stack, item)) continue;
-            mc.interactionManager.clickSlot(mc.player.playerScreenHandler.syncId, i, 0, SlotActionType.QUICK_MOVE, mc.player);
+
+            boolean swap = mode.is(Mode.QUICK_MOVE);
+
+            clickSlot(i, swap ? slot : 0, swap ? SlotActionType.SWAP : SlotActionType.QUICK_MOVE);
             return true;
         }
         return false;

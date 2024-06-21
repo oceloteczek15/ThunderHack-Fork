@@ -3,6 +3,7 @@ package thunder.hack.injection;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.RunArgs;
+import net.minecraft.client.gui.screen.Overlay;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.network.ServerInfo;
@@ -24,10 +25,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import thunder.hack.ThunderHack;
 import thunder.hack.core.impl.ModuleManager;
-import thunder.hack.events.impl.EventPostTick;
-import thunder.hack.events.impl.EventTick;
+import thunder.hack.events.impl.*;
+import thunder.hack.gui.clickui.ClickGUI;
 import thunder.hack.gui.font.FontRenderers;
 import thunder.hack.modules.Module;
 import thunder.hack.utility.render.WindowResizeCallback;
@@ -57,21 +59,22 @@ public abstract class MixinMinecraftClient {
     @Inject(method = "<init>", at = @At("TAIL"))
     void postWindowInit(RunArgs args, CallbackInfo ci) {
         try {
-            FontRenderers.settings = FontRenderers.createDefault(12f, "comfortaa");
-            FontRenderers.modules = FontRenderers.createDefault(15f, "comfortaa");
-            FontRenderers.categories = FontRenderers.createDefault(18f, "comfortaa");
-            FontRenderers.thglitch = FontRenderers.createDefault(36f, "glitched");
-            FontRenderers.thglitchBig = FontRenderers.createDefault(72f, "glitched");
-            FontRenderers.monsterrat = FontRenderers.createDefault(18f, "monsterrat");
-            FontRenderers.sf_bold = FontRenderers.createDefault(16f, "sf_bold");
-            FontRenderers.sf_medium = FontRenderers.createDefault(16f, "sf_medium");
-            FontRenderers.sf_medium_mini = FontRenderers.createDefault(12f, "sf_medium");
-            FontRenderers.sf_medium_modules = FontRenderers.createDefault(14f, "sf_medium");
-            FontRenderers.sf_bold_mini = FontRenderers.createDefault(14f, "sf_bold");
-            FontRenderers.sf_bold_micro = FontRenderers.createDefault(12f, "sf_bold");
-            FontRenderers.icons = FontRenderers.createIcons(20);
-            FontRenderers.mid_icons = FontRenderers.createIcons(46f);
-            FontRenderers.big_icons = FontRenderers.createIcons(72f);
+            FontRenderers.settings = FontRenderers.create(12f, "comfortaa");
+            FontRenderers.modules = FontRenderers.create(15f, "comfortaa");
+            FontRenderers.categories = FontRenderers.create(18f, "comfortaa");
+            FontRenderers.thglitch = FontRenderers.create(36f, "glitched");
+            FontRenderers.thglitchBig = FontRenderers.create(72f, "glitched");
+            FontRenderers.monsterrat = FontRenderers.create(18f, "monsterrat");
+            FontRenderers.sf_bold = FontRenderers.create(16f, "sf_bold");
+            FontRenderers.sf_medium = FontRenderers.create(16f, "sf_medium");
+            FontRenderers.sf_medium_mini = FontRenderers.create(12f, "sf_medium");
+            FontRenderers.sf_medium_modules = FontRenderers.create(14f, "sf_medium");
+            FontRenderers.sf_bold_mini = FontRenderers.create(14f, "sf_bold");
+            FontRenderers.sf_bold_micro = FontRenderers.create(12f, "sf_bold");
+            FontRenderers.profont = FontRenderers.create(16f, "profont");
+            FontRenderers.icons = FontRenderers.create(20, "icons");
+            FontRenderers.mid_icons = FontRenderers.create(46, "icons");
+            FontRenderers.big_icons = FontRenderers.create(72, "icons");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -94,7 +97,8 @@ public abstract class MixinMinecraftClient {
     @Shadow
     private static MinecraftClient instance;
 
-    @Shadow public abstract void setScreen(@Nullable Screen screen);
+    @Shadow
+    public abstract void setScreen(@Nullable Screen screen);
 
     @Inject(method = "onResolutionChanged", at = @At("TAIL"))
     private void captureResize(CallbackInfo ci) {
@@ -107,9 +111,24 @@ public abstract class MixinMinecraftClient {
             ci.cancel();
     }
 
+    @Inject(method = "setOverlay", at = @At("HEAD"))
+    public void setOverlay(Overlay overlay, CallbackInfo ci) {
+        //   if (overlay instanceof SplashOverlay)
+        //  ThunderHack.shaderManager.reloadShaders();
+    }
+
+    @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
+    public void setScreenHookPre(Screen screen, CallbackInfo ci) {
+        if (Module.fullNullCheck()) return;
+        EventScreen event = new EventScreen(screen);
+        ThunderHack.EVENT_BUS.post(event);
+        if (event.isCancelled() || (ClickGUI.close && screen == null)) ci.cancel();
+    }
+
     @Inject(method = "setScreen", at = @At("RETURN"))
-    public void setScreenHook(Screen screen, CallbackInfo ci) {
-        if(screen instanceof MultiplayerScreen mScreen && ModuleManager.antiServerAdd.isEnabled() && mScreen.getServerList() != null) {
+    public void setScreenHookPost(Screen screen, CallbackInfo ci) {
+        if (Module.fullNullCheck()) return;
+        if (screen instanceof MultiplayerScreen mScreen && ModuleManager.antiServerAdd.isEnabled() && mScreen.getServerList() != null) {
             for (int i = 0; i < mScreen.getServerList().size(); i++) {
                 ServerInfo info = mScreen.getServerList().get(i);
                 for (String server : shittyServers) {
@@ -157,6 +176,24 @@ public abstract class MixinMinecraftClient {
             GLFW.glfwSetWindowIcon(mc.getWindow().getHandle(), buffer);
             buffers.forEach(MemoryUtil::memFree);
         } catch (IOException ignored) {
+        }
+    }
+
+    @Inject(method = "doAttack", at = @At("HEAD"), cancellable = true)
+    private void doAttackHook(CallbackInfoReturnable<Boolean> cir) {
+        final EventAttack event = new EventAttack(null, true);
+        ThunderHack.EVENT_BUS.post(event);
+        if (event.isCancelled()) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "handleBlockBreaking", at = @At("HEAD"), cancellable = true)
+    private void handleBlockBreakingHook(boolean breaking, CallbackInfo ci) {
+        EventHandleBlockBreaking event = new EventHandleBlockBreaking();
+        ThunderHack.EVENT_BUS.post(event);
+        if (event.isCancelled()) {
+            ci.cancel();
         }
     }
 }

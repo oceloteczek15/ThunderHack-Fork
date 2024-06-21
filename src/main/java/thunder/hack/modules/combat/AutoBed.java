@@ -34,7 +34,7 @@ import thunder.hack.modules.Module;
 import thunder.hack.modules.client.HudEditor;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.ColorSetting;
-import thunder.hack.setting.impl.Parent;
+import thunder.hack.setting.impl.SettingGroup;
 import thunder.hack.utility.Timer;
 import thunder.hack.utility.math.ExplosionUtility;
 import thunder.hack.utility.math.MathUtility;
@@ -60,17 +60,18 @@ public final class AutoBed extends Module {
     public static final Setting<Float> maxSelfDamage = new Setting<>("MaxSelfDamage", 4f, 0f, 25.0f);
     private final Setting<Boolean> dimCheck = new Setting<>("DimensionCheck", false);
     public final Setting<Boolean> switchToHotbar = new Setting<>("SwitchToHotbar", true);
+    public final Setting<Boolean> oldPlace = new Setting<>("1.12 Place",false);
     public final Setting<Boolean> autoSwap = new Setting<>("AutoSwap", true);
     public final Setting<Boolean> autoCraft = new Setting<>("AutoCraft", true);
     public static final Setting<Integer> minBeds = new Setting<>("MinBeds", 4, 0, 10);
     public static final Setting<Integer> bedsPerCraft = new Setting<>("BedsPerCraft", 8, 1, 27);
-    private final Setting<Parent> renderCategory = new Setting<>("Render", new Parent(false, 0));
-    private final Setting<Boolean> render = new Setting<>("Render", true).withParent(renderCategory);
-    private final Setting<Boolean> rselfDamage = new Setting<>("SelfDamage", true).withParent(renderCategory);
-    private final Setting<Boolean> drawDamage = new Setting<>("RenderDamage", true).withParent(renderCategory);
-    private final Setting<ColorSetting> fillColor = new Setting<>("Fill", new ColorSetting(Render2DEngine.injectAlpha(HudEditor.getColor(0), 150))).withParent(renderCategory);
-    private final Setting<ColorSetting> lineColor = new Setting<>("Line", new ColorSetting(HudEditor.getColor(0))).withParent(renderCategory);
-    private final Setting<ColorSetting> textColor = new Setting<>("Text", new ColorSetting(Color.WHITE)).withParent(renderCategory);
+    private final Setting<SettingGroup> renderCategory = new Setting<>("Render", new SettingGroup(false, 0));
+    private final Setting<Boolean> render = new Setting<>("Render", true).addToGroup(renderCategory);
+    private final Setting<Boolean> rselfDamage = new Setting<>("SelfDamage", true).addToGroup(renderCategory);
+    private final Setting<Boolean> drawDamage = new Setting<>("RenderDamage", true).addToGroup(renderCategory);
+    private final Setting<ColorSetting> fillColor = new Setting<>("Fill", new ColorSetting(Render2DEngine.injectAlpha(HudEditor.getColor(0), 150))).addToGroup(renderCategory);
+    private final Setting<ColorSetting> lineColor = new Setting<>("Line", new ColorSetting(HudEditor.getColor(0))).addToGroup(renderCategory);
+    private final Setting<ColorSetting> textColor = new Setting<>("Text", new ColorSetting(Color.WHITE)).addToGroup(renderCategory);
 
     private PlayerEntity target;
     private BedData bestBed, bestPos;
@@ -79,11 +80,8 @@ public final class AutoBed extends Module {
     private final Timer placeTimer = new Timer();
     private final Timer explodeTimer = new Timer();
 
-    private static AutoBed instance;
-
     public AutoBed() {
         super("AutoBed", Category.COMBAT);
-        instance = this;
     }
 
     @EventHandler
@@ -103,8 +101,10 @@ public final class AutoBed extends Module {
             return;
         }
 
-        if (target == null)
+        if (target != null && (target.isDead() || target.getHealth() < 0)) {
+            target = null;
             return;
+        }
 
         bestBed = findBedToExplode();
         bestPos = findBlockToPlace();
@@ -133,7 +133,7 @@ public final class AutoBed extends Module {
 
     @EventHandler
     public void onPostSync(EventPostSync e) {
-        if (!(mc.player.getMainHandStack().getItem() instanceof BedItem) && autoSwap.getValue()) {
+        if (!(mc.player.getMainHandStack().getItem() instanceof BedItem) && autoSwap.getValue() && bestPos != null) {
             SearchInvResult hotBarResult = InventoryUtility.findBedInHotBar();
             if (hotBarResult.found()) {
                 hotBarResult.switchTo();
@@ -147,7 +147,7 @@ public final class AutoBed extends Module {
         }
 
         if (bestBed != null && explodeTimer.passedMs(explodeDelay.getValue())) {
-            sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, bestBed.hitResult(), PlayerUtility.getWorldActionId(mc.world)));
+            sendSequencedPacket(id -> new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, bestBed.hitResult(), id));
             mc.player.swingHand(Hand.MAIN_HAND);
             explodeTimer.reset();
         }
@@ -162,7 +162,7 @@ public final class AutoBed extends Module {
             mc.player.setYaw(angle2);
             mc.player.prevYaw = angle2;
             ((IClientPlayerEntity) mc.player).setLastYaw(angle2);
-            sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, bestPos.hitResult(), PlayerUtility.getWorldActionId(mc.world)));
+            sendSequencedPacket(id -> new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, bestPos.hitResult(), id));
             mc.player.swingHand(Hand.MAIN_HAND);
             placeTimer.reset();
             mc.player.setYaw(prevYaw);
@@ -204,8 +204,8 @@ public final class AutoBed extends Module {
                     BlockHitResult bhr = getInteractResult(b);
 
                     mc.world.removeBlock(b, false);
-                    float damage = ExplosionUtility.getExplosionDamage(b.toCenterPos().add(0, -0.5, 0), target);
-                    float selfDamage = ExplosionUtility.getExplosionDamage(b.toCenterPos().add(0, -0.5, 0), mc.player);
+                    float damage = ExplosionUtility.getExplosionDamage(b.toCenterPos().add(0, -0.5, 0), target, false);
+                    float selfDamage = ExplosionUtility.getExplosionDamage(b.toCenterPos().add(0, -0.5, 0), mc.player, false);
                     mc.world.setBlockState(b, state);
 
                     if (damage < minDamage.getValue())
@@ -250,8 +250,8 @@ public final class AutoBed extends Module {
                         if (wallCheck != null && wallCheck.getType() == HitResult.Type.BLOCK && wallCheck.getBlockPos() != b)
                             continue;
 
-                        float damage = ExplosionUtility.getExplosionDamage(b.up().toCenterPos().add(0, -0.5, 0), target);
-                        float selfDamage = ExplosionUtility.getExplosionDamage(b.up().toCenterPos().add(0, -0.5, 0), mc.player);
+                        float damage = ExplosionUtility.getExplosionDamage(b.up().toCenterPos().add(0, -0.5, 0), target, false);
+                        float selfDamage = ExplosionUtility.getExplosionDamage(b.up().toCenterPos().add(0, -0.5, 0), mc.player, false);
 
                         if (damage < minDamage.getValue())
                             continue;
@@ -267,7 +267,7 @@ public final class AutoBed extends Module {
 
 
                         float bestDirdmg = 0;
-                        Direction bestDir = Direction.NORTH;
+                        Direction bestDir = null;
                         for (Direction dir : Direction.values()) {
                             if (dir == Direction.DOWN || dir == Direction.UP)
                                 continue;
@@ -276,15 +276,19 @@ public final class AutoBed extends Module {
                             if(!mc.world.getBlockState(offset).isReplaceable())
                                 continue;
 
-                            float dirdamage = ExplosionUtility.getExplosionDamage(offset.toCenterPos().add(0, -0.5, 0), target);
-                            float dirSelfDamage = ExplosionUtility.getExplosionDamage(offset.toCenterPos().add(0, -0.5, 0), mc.player);
+                            if(oldPlace.getValue() && mc.world.getBlockState(b.offset(dir)).isReplaceable()){
+                                continue;
+                            }
+
+                            float dirdamage = ExplosionUtility.getExplosionDamage(offset.toCenterPos().add(0, -0.5, 0), target, false);
+                            float dirSelfDamage = ExplosionUtility.getExplosionDamage(offset.toCenterPos().add(0, -0.5, 0), mc.player, false);
                             if (dirdamage > bestDirdmg && dirSelfDamage <= maxSelfDamage.getValue()) {
                                 bestDir = dir;
                                 bestDirdmg = dirdamage;
                             }
                         }
 
-                        bestData = new BedData(bhr, damage, selfDamage, bestDir);
+                        bestData = bestDir == null ? null : new BedData(bhr, damage, selfDamage, bestDir);
                     }
                 }
             }
@@ -315,13 +319,10 @@ public final class AutoBed extends Module {
                             }
                         }
                     } else {
-                        float[] angle;
-
-                        angle = InteractionUtility.calculateAngle(result.getPos());
+                        float[] angle = InteractionUtility.calculateAngle(result.getPos());
                         mc.player.setYaw(angle[0]);
                         mc.player.setPitch(angle[1]);
-
-                        sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, result, PlayerUtility.getWorldActionId(mc.world)));
+                        sendSequencedPacket(id -> new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, result, id));
                     }
                 }
             }
@@ -384,8 +385,5 @@ public final class AutoBed extends Module {
     private record BedData(BlockHitResult hitResult, float damage, float selfDamage, Direction dir) {
     }
 
-    public static AutoBed getInstance() {
-        return instance;
-    }
 }
 

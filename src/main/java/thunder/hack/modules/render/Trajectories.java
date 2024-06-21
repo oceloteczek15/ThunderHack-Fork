@@ -10,7 +10,10 @@ import net.minecraft.item.*;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.*;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 import thunder.hack.modules.Module;
 import thunder.hack.modules.client.HudEditor;
@@ -57,6 +60,7 @@ public class Trajectories extends Module {
 
     @Override
     public void onRender3D(MatrixStack stack) {
+        if(mc.options.hudHidden) return;
         if (mc.player == null || mc.world == null || !mc.options.getPerspective().isFirstPerson())
             return;
         Hand hand;
@@ -166,13 +170,16 @@ public class Trajectories extends Module {
                 Render3DEngine.FILLED_SIDE_QUEUE.add(new Render3DEngine.FillSideAction(
                         new Box(bhr.getBlockPos()), lmode.getValue() == Mode.Sync ? Render2DEngine.injectAlpha(HudEditor.getColor(i * 10), 100) : lcolor.getValue().getColorObject(), bhr.getSide()
                 ));
+
+
+
                 break;
             }
 
             if (y <= -65) break;
             if (motionX == 0 && motionY == 0 && motionZ == 0) continue;
 
-            Render3DEngine.drawLine((float) lastPos.x, (float) lastPos.y, (float) lastPos.z, (float) x, (float) y, (float) z, mode.getValue() == Mode.Sync ? HudEditor.getColor(i) : color.getValue().getColorObject(), 2);
+            Render3DEngine.drawLine(lastPos, pos, mode.getValue() == Mode.Sync ? HudEditor.getColor(i) : color.getValue().getColorObject());
         }
     }
 }
